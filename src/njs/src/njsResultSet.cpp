@@ -722,6 +722,7 @@ void ResultSet::clearFetchBuffer( Define* defineBuffers, unsigned int numCols,
      free(defineBuffers[i].buf);
      free(defineBuffers[i].len);
      free(defineBuffers[i].ind);
+     delete defineBuffers[i].udt;
    }
    delete [] defineBuffers;
    defineBuffers = NULL;

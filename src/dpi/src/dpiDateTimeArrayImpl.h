@@ -24,7 +24,6 @@
 
 #ifndef DPIDATETIMEARRAYIMPL_ORACLE
 # define DPIDATEARRAYIMPL_ORACLE
-#endif
 
 #ifndef DPISTMT_ORACLE
 # include <dpiEnv.h>
@@ -85,3 +84,5 @@ private:
 };
 
 };
+
+#endif

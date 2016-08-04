@@ -50,6 +50,8 @@
 # include <dpiUtils.h>
 #endif
 
+#include <dpiUdtImpl.h>
+
 #include <stdlib.h>
 
 #include <iostream>
@@ -87,7 +89,7 @@ using namespace std;
 StmtImpl::StmtImpl (EnvImpl *env, OCIEnv *envh, ConnImpl *conn,
                     OCISvcCtx *svch, const string &sql)
 
-  try : conn_(conn), errh_(NULL), svch_(svch),
+  try : conn_(conn), errh_(NULL), svch_(svch), envh_(envh),
         stmth_(NULL), numCols_ (0),meta_(NULL), stmtType_ (DpiStmtUnknown),
         isReturning_(false), isReturningSet_(false), refCursor_(false),
         state_(DPI_STMT_STATE_UNDEFINED)
@@ -406,9 +408,22 @@ void StmtImpl::release ()
     -None-
 */
 void StmtImpl::define (unsigned int pos, unsigned short type, void *buf,
-                       DPI_SZ_TYPE bufSize, short *ind, DPI_BUFLEN_TYPE *bufLen)
+                       DPI_SZ_TYPE bufSize, short *ind, DPI_BUFLEN_TYPE *bufLen, dpi::Udt *&udt)
 {
   OCIDefine *d = (OCIDefine *)0;
+
+  if (type == DpiUDT) {
+    void *stmtDesc = NULL;
+    ociCall (OCIParamGet (stmth_, OCI_HTYPE_STMT, errh_, &stmtDesc, pos), errh_);
+
+    auto udtImpl = new UdtImpl(stmtDesc, envh_, svch_);
+    udt = udtImpl;
+
+    ociCall (DPIDEFINEBYPOS (stmth_, &d, errh_, pos, NULL, 0, type, NULL, NULL, NULL, OCI_DEFAULT), errh_);
+    ociCall (OCIDefineObject (d, errh_, udtImpl->objType, (void**)buf, 0, 0, 0), errh_);
+    return;
+  }
+
   ociCall (DPIDEFINEBYPOS (stmth_, &d, errh_, pos, buf, bufSize, type,
                            (void *)ind, bufLen, NULL,
                            OCI_DEFAULT),

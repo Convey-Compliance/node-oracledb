@@ -2069,6 +2069,11 @@ void Connection::CopyMetaData ( MetaInfo           *mInfo,
                                   NJS_DATATYPE_STR : NJS_DATATYPE_UNKNOWN;
         break;
 
+      case dpi::DpiUDT:
+        mInfo[col].dpiFetchType = mData[col].dbType;
+        mInfo[col].njsFetchType = NJS_DATATYPE_DEFAULT;
+        break;
+
       default:
         mInfo[col].njsFetchType = NJS_DATATYPE_UNKNOWN;
         mInfo[col].dbType       = NJS_DATATYPE_UNKNOWN;
@@ -2515,6 +2520,29 @@ void Connection::DoDefines ( eBaton* executeBaton )
         }
         break;
 
+      case dpi::DpiUDT:
+        defines[col].fetchType = executeBaton->mInfo[col].dbType;
+        defines[col].maxSize   = sizeof(void *);
+
+        if ( NJS_SIZE_T_OVERFLOW ( defines[col].maxSize,
+                                   executeBaton->maxRows ) )
+        {
+          executeBaton->error = NJSMessages::getErrorMsg( errResultsTooLarge );
+          error = true;
+        }
+        else
+        {
+          defines[col].buf = calloc( executeBaton->maxRows,
+                                     (size_t)defines[col].maxSize );
+
+          if( !defines[col].buf )
+          {
+            executeBaton->error =
+                          NJSMessages::getErrorMsg( errInsufficientMemory );
+            error = true;
+          }
+        }
+        break;
       default :
         // For unsupported column types, an error is reported earlier itself
         executeBaton->error = NJSMessages::getErrorMsg( errInternalError,
@@ -2542,7 +2570,7 @@ void Connection::DoDefines ( eBaton* executeBaton )
 
       executeBaton->dpistmt->define(col+1, defines[col].fetchType,
                    (defines[col].buf) ? defines[col].buf : defines[col].extbuf,
-                   defines[col].maxSize, defines[col].ind, defines[col].len);
+                   defines[col].maxSize, defines[col].ind, defines[col].len, defines[col].udt);
     }
   }
 }
@@ -3077,15 +3105,19 @@ Local<Value> Connection::GetValue ( eBaton *executeBaton,
     // SELECT queries
     Define *define = &(executeBaton->defines[col]);
     long double *dblArr = (long double *)define->buf;
-    Local<Value> value = Connection::GetValueCommon(
-                           executeBaton,
-                           define->ind[row],
-                           define->fetchType,
-                           (define->fetchType == DpiTimestampLTZ ) ?
-                             (void *) &dblArr[row] :
-                             (void *) ((char *)(define->buf) +
-                              ( row * (define->maxSize ))),
-                           define->len[row] );
+    auto val = (void *) ((char *)define->buf + row * define->maxSize);
+
+    Local<Value> value;
+    if (define->fetchType == dpi::DpiUDT)
+      value = define->udt->toJsObject(val);
+    else
+      value = Connection::GetValueCommon(
+                             executeBaton,
+                             define->ind[row],
+                             define->fetchType,
+                             (define->fetchType == DpiTimestampLTZ ) ?
+                               (void *) &dblArr[row] : val,
+                             define->len[row] );
     return scope.Escape( value );
   }
   else
