@@ -1,5 +1,7 @@
 #include "dpiUdtImpl.h"
 #include <dpiUtils.h>
+#include "../../njs/src/njsUtils.h"
+
 extern "C" {
 #include "orid.h"
 }
@@ -52,7 +54,8 @@ v8::Local<v8::Value> UdtImpl::primitiveToJsObj(OCITypeCode typecode, void *attr_
   return Nan::Null();
 }
 
-v8::Local<v8::Object> UdtImpl::toJsObject(void *obj_buf) {
+v8::Local<v8::Object> UdtImpl::toJsObject(void *obj_buf, unsigned int outFormat) {
+  outFormat_ = outFormat;
   auto oracleObj = *(void**)obj_buf;
   void *oracleObjNull = nullptr;
   ociCall (OCIObjectGetInd (envh_, errh_, oracleObj, &oracleObjNull), errh_);
@@ -61,7 +64,7 @@ v8::Local<v8::Object> UdtImpl::toJsObject(void *obj_buf) {
 }
 
 v8::Local<v8::Object> UdtImpl::toJsObject(OCIType *tdo, void *obj_buf, void *obj_null) {
-  auto obj = Nan::New<v8::Object>();
+  v8::Local<v8::Object> obj;
 
   OCIDescribe *describeHandle = 0;
   ociCall (OCIHandleAlloc (envh_, (dvoid **)&describeHandle, OCI_HTYPE_DESCRIBE, 0, 0), errh_);
@@ -78,7 +81,15 @@ v8::Local<v8::Object> UdtImpl::toJsObject(OCIType *tdo, void *obj_buf, void *obj
       ociCall (OCIAttrGet (paramHandle, OCI_DTYPE_PARAM, &count, 0, OCI_ATTR_NUM_TYPE_ATTRS, errh_), errh_);
       dvoid *list_attr;
       ociCall (OCIAttrGet (paramHandle, OCI_DTYPE_PARAM, &list_attr, 0, OCI_ATTR_LIST_TYPE_ATTRS, errh_), errh_);
+
+      uint32_t objArrIdx = 0;
+      if (outFormat_ == NJS_ROWS_ARRAY)
+        obj = Nan::New<v8::Array>(count);
+      else
+        obj = Nan::New<v8::Object>();
+
       for (ub2 j = 1; j <= count; j++) {
+        v8::Local<v8::Value> val;
         dvoid *elemHandle = nullptr;
         ociCall (OCIParamGet (list_attr, OCI_DTYPE_PARAM, errh_, &elemHandle, j), errh_);
         char *elemName;
@@ -95,7 +106,7 @@ v8::Local<v8::Object> UdtImpl::toJsObject(OCIType *tdo, void *obj_buf, void *obj
                                    &attr_null_status, &attr_null_struct, &attr_value, &attr_tdo), errh_);
 
         if (attr_null_status != OCI_IND_NOTNULL) {
-          Nan::Set(obj, key, Nan::Null());
+          val = Nan::Null();
           break;
         }
 
@@ -105,11 +116,15 @@ v8::Local<v8::Object> UdtImpl::toJsObject(OCIType *tdo, void *obj_buf, void *obj
         switch (elemTypecode) {
         case OCI_TYPECODE_NAMEDCOLLECTION:
         case OCI_TYPECODE_OBJECT:
-          Nan::Set(obj, key, toJsObject(attr_tdo, attr_value, attr_null_struct));
+          val = toJsObject(attr_tdo, attr_value, attr_null_struct);
           break;
         default:
-          Nan::Set(obj, key, primitiveToJsObj(elemTypecode, attr_value));
+          val = primitiveToJsObj(elemTypecode, attr_value);
         }
+        if (obj->IsArray())
+          Nan::Set(obj, objArrIdx++, val);
+        else
+          Nan::Set(obj, key, val);
       }
       break;
     }

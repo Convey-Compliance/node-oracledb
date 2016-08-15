@@ -11,9 +11,10 @@ class UdtImpl : public Udt
 {
 public:
   OCIType *objType;
+  unsigned int outFormat_;
 
   UdtImpl (void *stmtDesc, OCIEnv *envh, OCISvcCtx *svch);
-  virtual v8::Local<v8::Object> toJsObject(void *obj_buf);
+  virtual v8::Local<v8::Object> toJsObject(void *obj_buf, unsigned int outFormat);
 private:
   OCIEnv   *envh_;
   OCISvcCtx *svch_;
