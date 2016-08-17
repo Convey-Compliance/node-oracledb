@@ -10,19 +10,10 @@ extern "C" {
 
 using namespace dpi;
 
-UdtImpl::UdtImpl (void *stmtDesc, OCIEnv *envh, OCISvcCtx *svch)
-  : stmtDesc_(stmtDesc), envh_ (envh), svch_ (svch)
+UdtImpl::UdtImpl (OCIEnv *envh, OCISvcCtx *svch, OCIType *objType)
+  : envh_ (envh), svch_ (svch), objType_(objType)
 {
-  objType = nullptr;
-
   ociCallEnv (OCIHandleAlloc ((void *)envh, (void**)&errh_, OCI_HTYPE_ERROR, 0, (dvoid **)0), envh);
-
-  text *defineName = NULL;
-  ub4 defineNameSize = 0;
-  ociCall (OCIAttrGet (stmtDesc_, OCI_DTYPE_PARAM, &defineName, &defineNameSize, OCI_ATTR_TYPE_NAME, errh_), errh_);
-
-  ociCall (OCITypeByName (envh_, errh_, svch_, NULL, 0, defineName, defineNameSize, NULL, 0,
-    OCI_DURATION_SESSION, OCI_TYPEGET_HEADER, &objType), errh_);
 }
 
 double UdtImpl::ocidateToMsecSinceEpoch(const OCIDate *date) {
@@ -84,7 +75,7 @@ v8::Local<v8::Object> UdtImpl::toJsObject(void *obj_buf, unsigned int outFormat)
   void *oracleObjNull = nullptr;
   ociCall (OCIObjectGetInd (envh_, errh_, oracleObj, &oracleObjNull), errh_);
 
-  return toJsObject(objType, oracleObj, oracleObjNull);
+  return toJsObject(objType_, oracleObj, oracleObjNull);
 }
 
 v8::Local<v8::Object> UdtImpl::toJsObject(OCIType *tdo, void *obj_buf, void *obj_null) {

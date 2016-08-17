@@ -130,7 +130,7 @@ private:
   OCIError       *errh_;           // OCI Error object for this stmt execution
   OCISvcCtx      *svch_;           // OCI service handle
   OCIStmt        *stmth_;          // OCI Stmt handle
-  OCIEnv *envh_;
+  OCIEnv         *envh_;
 
   unsigned int   numCols_;         // # of cols this stmt execution will return
   MetaData       *meta_;           // Meta data array

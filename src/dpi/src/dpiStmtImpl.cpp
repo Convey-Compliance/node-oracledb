@@ -416,11 +416,19 @@ void StmtImpl::define (unsigned int pos, unsigned short type, void *buf,
     void *stmtDesc = NULL;
     ociCall (OCIParamGet (stmth_, OCI_HTYPE_STMT, errh_, &stmtDesc, pos), errh_);
 
-    auto udtImpl = new UdtImpl(stmtDesc, envh_, svch_);
+    text *defineName = NULL;
+    ub4 defineNameSize = 0;
+    ociCall (OCIAttrGet (stmtDesc, OCI_DTYPE_PARAM, &defineName, &defineNameSize, OCI_ATTR_TYPE_NAME, errh_), errh_);
+
+    OCIType *objType;
+    ociCall (OCITypeByName (envh_, errh_, svch_, NULL, 0, defineName, defineNameSize, NULL, 0,
+    OCI_DURATION_SESSION, OCI_TYPEGET_HEADER, &objType), errh_);
+
+    auto udtImpl = new UdtImpl(envh_, svch_, objType);
     udt = udtImpl;
 
     ociCall (DPIDEFINEBYPOS (stmth_, &d, errh_, pos, NULL, 0, type, NULL, NULL, NULL, OCI_DEFAULT), errh_);
-    ociCall (OCIDefineObject (d, errh_, udtImpl->objType, (void**)buf, 0, 0, 0), errh_);
+    ociCall (OCIDefineObject (d, errh_, objType, (void**)buf, 0, 0, 0), errh_);
     return;
   }
 

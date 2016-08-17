@@ -30,6 +30,8 @@
 # include <oci.h>
 #endif
 
+#include <dpiUdt.h>
+
 #if !defined(OCI_MAJOR_VERSION) || (OCI_MAJOR_VERSION < 11) || \
 ((OCI_MAJOR_VERSION == 11) && (OCI_MINOR_VERSION < 2))
 #error Oracle 11.2 or later client libraries are required for building
@@ -42,7 +44,6 @@ using std::string;
 
 namespace dpi
 {
-class Udt;
 
 
 /*---------------------------------------------------------------------------
