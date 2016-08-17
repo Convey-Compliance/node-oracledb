@@ -15,6 +15,7 @@ public:
 
   UdtImpl (void *stmtDesc, OCIEnv *envh, OCISvcCtx *svch);
   virtual v8::Local<v8::Object> toJsObject(void *obj_buf, unsigned int outFormat);
+  static double ocidateToMsecSinceEpoch(const OCIDate *date);
 private:
   OCIEnv   *envh_;
   OCISvcCtx *svch_;

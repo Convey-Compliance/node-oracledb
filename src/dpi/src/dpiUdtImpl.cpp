@@ -1,6 +1,7 @@
 #include "dpiUdtImpl.h"
 #include <dpiUtils.h>
 #include "../../njs/src/njsUtils.h"
+#include <ctime>
 
 extern "C" {
 #include "orid.h"
@@ -24,18 +25,37 @@ UdtImpl::UdtImpl (void *stmtDesc, OCIEnv *envh, OCISvcCtx *svch)
     OCI_DURATION_SESSION, OCI_TYPEGET_HEADER, &objType), errh_);
 }
 
+double UdtImpl::ocidateToMsecSinceEpoch(const OCIDate *date) {
+  struct tm future;
+
+  future.tm_sec = date->OCIDateTime.OCITimeSS;
+  future.tm_min = date->OCIDateTime.OCITimeMI;
+  future.tm_hour = date->OCIDateTime.OCITimeHH;
+  future.tm_mday = date->OCIDateDD;
+  future.tm_mon = date->OCIDateMM - 1; // should start from 0
+  future.tm_year = date->OCIDateYYYY - 1900;
+  future.tm_isdst = -1;
+
+  return (double)(mktime(&future) * 1000);
+}
+
 v8::Local<v8::Value> UdtImpl::primitiveToJsObj(OCITypeCode typecode, void *attr_value) {
   switch (typecode) {
     case OCI_TYPECODE_DATE :
-      return Nan::New<v8::Date>(*(long double*)attr_value).ToLocalChecked();
-    case OCI_TYPECODE_RAW : // TODO: support
-      break;
+      return Nan::New<v8::Date>(ocidateToMsecSinceEpoch((OCIDate *)attr_value)).ToLocalChecked();
+    case OCI_TYPECODE_RAW : {
+      OCIRaw *rawPtr = *(OCIRaw**)attr_value;
+      auto raw = (char*)OCIRawPtr(envh_, rawPtr);
+      auto rawSize = OCIRawSize(envh_, rawPtr);
+      return Nan::CopyBuffer(raw, rawSize).ToLocalChecked();
+    }
     case OCI_TYPECODE_CHAR :
     case OCI_TYPECODE_VARCHAR :
     case OCI_TYPECODE_VARCHAR2 : {
-      OCIString *vs = *(OCIString**)attr_value;
-      auto str = (char*)OCIStringPtr(envh_,vs);
-      auto strSize = OCIStringSize(envh_, vs);
+      OCIString *strPtr = *(OCIString**)attr_value;
+      auto str = (char*)OCIStringPtr(envh_, strPtr);
+      auto strSize = OCIStringSize(envh_, strPtr);
+
       return Nan::New<v8::String>(str, strSize).ToLocalChecked();
     }
     case OCI_TYPECODE_UNSIGNED16 :
@@ -48,8 +68,12 @@ v8::Local<v8::Value> UdtImpl::primitiveToJsObj(OCITypeCode typecode, void *attr_
     case OCI_TYPECODE_DECIMAL :
     case OCI_TYPECODE_FLOAT :
     case OCI_TYPECODE_NUMBER :
-    case OCI_TYPECODE_SMALLINT :
-      return Nan::New<v8::Number>(*(double*)attr_value);
+    case OCI_TYPECODE_SMALLINT : {
+      double dnum;
+      ociCall (OCINumberToReal(errh_, (OCINumber*)attr_value, sizeof dnum, &dnum), errh_);
+
+      return Nan::New<v8::Number>(dnum);
+    }
   }
   return Nan::Null();
 }

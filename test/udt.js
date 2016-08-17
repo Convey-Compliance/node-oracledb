@@ -53,6 +53,19 @@ describe('67 udt.js', function() {
               WHEN OTHERS \
               THEN NULL; \
           END; \
+          BEGIN \
+              EXECUTE IMMEDIATE ('DROP TYPE primitives_udt'); \
+          EXCEPTION \
+              WHEN OTHERS \
+              THEN NULL; \
+          END; \
+          EXECUTE IMMEDIATE (' \
+              CREATE TYPE primitives_udt AS OBJECT ( \
+                num     NUMBER, \
+                dateVal DATE, \
+                rawVal RAW(100)\
+              ) \
+          '); \
           EXECUTE IMMEDIATE (' \
               CREATE TYPE str_kvp AS OBJECT ( \
                 key   varchar2 (30 char) , \
@@ -71,7 +84,8 @@ describe('67 udt.js', function() {
           EXECUTE IMMEDIATE (' \
               CREATE TABLE udt ( \
                   id NUMBER, \
-                  udt str_kvp \
+                  udt str_kvp, \
+                  primitives primitives_udt \
               ) \
           '); \
           EXECUTE IMMEDIATE (' \
@@ -93,7 +107,8 @@ describe('67 udt.js', function() {
   var insertRows =
       "BEGIN \
           FOR i IN 0.." + (rowsAmount - 1) + " LOOP \
-             INSERT INTO udt VALUES (i, str_kvp('key ' || i, 'val ' || i)); \
+             INSERT INTO udt VALUES (i, str_kvp('key ' || i, 'val ' || i), \
+                                     primitives_udt(i, to_date('2016-1-1', 'yyyy-mm-dd') + i, to_char(i, 'fm0x'))); \
              INSERT INTO udt_nested VALUES (i, str_kvp_nested('key nested ' || i, str_kvp('key ' || i, 'val ' || i))); \
              INSERT INTO udt_table VALUES (i, str_kvp_table(str_kvp('key ' || i, 'val ' || i), str_kvp(i || 'key ', i || 'val '))); \
           END LOOP; \
@@ -122,6 +137,7 @@ describe('67 udt.js', function() {
           EXECUTE IMMEDIATE ('DROP TYPE str_kvp_table'); \
           EXECUTE IMMEDIATE ('DROP TYPE str_kvp_nested'); \
           EXECUTE IMMEDIATE ('DROP TYPE str_kvp'); \
+          EXECUTE IMMEDIATE ('DROP TYPE primitives_udt'); \
        END; ",
       function(err) {
         if(err) { console.error(err.message); return; }
@@ -132,6 +148,19 @@ describe('67 udt.js', function() {
       }
     );
   })
+
+  Date.prototype.addDays = function (days) {
+    var dat = new Date(this.valueOf());
+    dat.setDate(dat.getDate() + days);
+    return dat;
+  }
+  var testDate = new Date('2016-1-1');
+
+  Number.prototype.toValidHex = function () {
+    var hex = this.toString(16);
+
+    return (hex.length % 2 === 0) ? hex : '0' + hex;
+  }
 
   describe('67.1 Testing fetch of UDT object', function() {
     it('67.1.1 when outFormat = oracledb.ARRAY, fetched rows are correct', function (done) {
@@ -146,8 +175,10 @@ describe('67 udt.js', function() {
 
           should.exist(result.rows);
           result.rows.length.should.be.exactly(rowsAmount);
-          for (var i = 0; i < rowsAmount; ++i)
-            should.deepEqual(result.rows[i], [ i, [ 'key ' + i, 'val ' + i ] ]);
+          for (var i = 0; i < rowsAmount; ++i) {
+            var rawBuf = new Buffer(i.toValidHex(), 'hex');
+            should.deepEqual(result.rows[i], [i, ['key ' + i, 'val ' + i], [i, testDate.addDays(i), rawBuf]]);
+          }
           done();
         }
       );
@@ -165,8 +196,14 @@ describe('67 udt.js', function() {
 
           should.exist(result.rows);
           result.rows.length.should.be.exactly(rowsAmount);
-          for (var i = 0; i < rowsAmount; ++i)
-            should.deepEqual(result.rows[i], { ID: i, UDT: { KEY: 'key ' + i, VALUE: 'val ' + i }});
+          for (var i = 0; i < rowsAmount; ++i) {
+            var rawBuf = new Buffer(i.toValidHex(), 'hex');
+            should.deepEqual(result.rows[i], {
+              ID: i,
+              UDT: { KEY: 'key ' + i, VALUE: 'val ' + i },
+              PRIMITIVES: { NUM: i, DATEVAL: testDate.addDays(i), RAWVAL: rawBuf }
+            });
+          }
           done();
         }
       );
