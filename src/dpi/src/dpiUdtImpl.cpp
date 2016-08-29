@@ -168,8 +168,17 @@ v8::Local<v8::Object> UdtImpl::toJsObject(OCIType *tdo, void *obj_buf, void *obj
 
             OCITypeCode collElemTypecode;
             ociCall (OCIAttrGet (collElemHandle, OCI_DTYPE_PARAM, &collElemTypecode, 0, OCI_ATTR_TYPECODE, errh_), errh_);
+            v8::Local<v8::Value> collElemVal;
+            switch (collElemTypecode) {
+            case OCI_TYPECODE_NAMEDCOLLECTION:
+            case OCI_TYPECODE_OBJECT:
+              collElemVal = toJsObject(collElemType, elem, elemNull);
+              break;
+            default:
+              collElemVal = primitiveToJsObj(collElemTypecode, elem);
+            }
 
-            Nan::Set(arr, i, toJsObject(collElemType, elem, elemNull));
+            Nan::Set(arr, i, collElemVal);
           }
 
           obj = arr;
