@@ -428,7 +428,7 @@ void StmtImpl::define (unsigned int pos, unsigned short type, void *buf,
     udt = udtImpl;
 
     ociCall (DPIDEFINEBYPOS (stmth_, &d, errh_, pos, NULL, 0, type, NULL, NULL, NULL, OCI_DEFAULT), errh_);
-    ociCall (OCIDefineObject (d, errh_, objType, (void**)buf, 0, 0, 0), errh_);
+    ociCall (OCIDefineObject (d, errh_, objType, (void**)buf, 0, (void **)ind, 0), errh_);
     return;
   }
 

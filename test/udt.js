@@ -17,6 +17,14 @@ describe('67 udt.js', function() {
     e_type_missing EXCEPTION;
     PRAGMA EXCEPTION_INIT(e_type_missing, -04043);
   BEGIN
+    EXECUTE IMMEDIATE('DROP TYPE test_udt_num_table');
+  EXCEPTION
+    WHEN e_type_missing THEN NULL;
+  END;
+  DECLARE
+    e_type_missing EXCEPTION;
+    PRAGMA EXCEPTION_INIT(e_type_missing, -04043);
+  BEGIN
     EXECUTE IMMEDIATE('DROP TYPE test_udt_str_kvp_table');
   EXCEPTION
     WHEN e_type_missing THEN NULL;
@@ -65,6 +73,9 @@ describe('67 udt.js', function() {
     )
   ');
   EXECUTE IMMEDIATE('
+    CREATE TYPE test_udt_num_table AS TABLE OF number
+  ');
+  EXECUTE IMMEDIATE('
     CREATE TYPE test_udt_str_kvp_table AS TABLE OF test_udt_str_kvp
   ');
   EXECUTE IMMEDIATE('
@@ -80,6 +91,7 @@ describe('67 udt.js', function() {
   END;`;
   const dropQuery = `BEGIN
     EXECUTE IMMEDIATE('DROP TABLE test_udt');
+    EXECUTE IMMEDIATE('DROP TYPE test_udt_num_table');
     EXECUTE IMMEDIATE('DROP TYPE test_udt_str_kvp_table');
     EXECUTE IMMEDIATE('DROP TYPE test_udt_str_kvp_nested');
     EXECUTE IMMEDIATE('DROP TYPE test_udt_str_kvp');
@@ -190,6 +202,22 @@ describe('67 udt.js', function() {
         });
       })
 
+      it('67.1.1.3 contains null values', function (done) {
+        connection.should.be.ok();
+        const queryNulls = "SELECT test_udt_primitives(NULL, NULL, NULL) as obj FROM dual";
+
+        connection.execute(queryNulls, [], { outFormat: oracledb.OBJECT }, function (err, result) {
+          should.not.exist(err);
+
+          should.exist(result.rows);
+          result.rows.length.should.be.exactly(1);
+
+          should.deepEqual(result.rows[0], { OBJ: { NUM: null, DATEVAL: null, RAWVAL: null } });
+
+          done();
+        });
+      })
+
     })
 
     describe('67.1.2 nested UDT object', function () {
@@ -222,6 +250,22 @@ describe('67 udt.js', function() {
           done();
         });
       })
+
+      it('67.1.2.3 contains null values', function (done) {
+        connection.should.be.ok();
+        const queryNulls = "SELECT test_udt_str_kvp_nested(NULL, test_udt_str_kvp(NULL, NULL)) as NESTED_OBJ FROM dual";
+
+        connection.execute(queryNulls, [], { outFormat: oracledb.OBJECT }, function (err, result) {
+          should.not.exist(err);
+
+          should.exist(result.rows);
+          result.rows.length.should.be.exactly(1);
+
+          should.deepEqual(result.rows[0], { NESTED_OBJ: { KEY: null, VALUE: { KEY: null, VALUE: null } } });
+
+          done();
+        });
+      })
     })
 
     describe('67.1.3 nested table', function () {
@@ -251,6 +295,22 @@ describe('67 udt.js', function() {
           result.rows.length.should.be.exactly(rowsAmount);
           for (var i = 0; i < rowsAmount; ++i)
             should.deepEqual(result.rows[i], { ID: i, TAB: [{ KEY: 'key ' + i, VALUE: 'val ' + i }, { KEY: i + 'key ', VALUE: i + 'val ' }] });
+          done();
+        });
+      })
+
+      it('67.1.3.3 contains null values', function (done) {
+        connection.should.be.ok();
+        const queryNulls = "SELECT test_udt_num_table(NULL, NULL) as primitives_tab, test_udt_str_kvp_table(NULL, NULL, NULL) as tab FROM dual";
+
+        connection.execute(queryNulls, [], { outFormat: oracledb.OBJECT }, function (err, result) {
+          should.not.exist(err);
+
+          should.exist(result.rows);
+          result.rows.length.should.be.exactly(1);
+
+          should.deepEqual(result.rows[0], { PRIMITIVES_TAB: [ null, null ], TAB: [ null, null, null ] });
+
           done();
         });
       })

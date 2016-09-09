@@ -10,18 +10,18 @@ namespace dpi
 class UdtImpl : public Udt
 {
 public:
-  OCIType *objType_;
-  unsigned int outFormat_;
-
   UdtImpl (OCIEnv *envh, OCISvcCtx *svch, OCIType *objType);
-  virtual v8::Local<v8::Object> toJsObject(void *obj_buf, unsigned int outFormat);
   static double ocidateToMsecSinceEpoch(const OCIDate *date);
+
+  virtual v8::Local<v8::Value> toJsObject(void *ind, void *obj_buf, unsigned int outFormat);
 private:
   OCIEnv   *envh_;
   OCISvcCtx *svch_;
   OCIError *errh_;
-  v8::Local<v8::Value> UdtImpl::primitiveToJsObj(OCITypeCode typecode, void *attr_value);
-  v8::Local<v8::Object> toJsObject(OCIType *tdo, void *obj_buf, void *obj_null);
+  unsigned int outFormat_;
+  OCIType *objType_;
+  v8::Local<v8::Value> UdtImpl::primitiveToJsObj(OCIInd ind,OCITypeCode typecode, void *attr_value);
+  v8::Local<v8::Value> toJsObject(OCIType *tdo, void *obj_buf, void *obj_null);
 };
 
 };

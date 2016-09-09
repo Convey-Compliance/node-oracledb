@@ -13,7 +13,8 @@ using namespace dpi;
 UdtImpl::UdtImpl (OCIEnv *envh, OCISvcCtx *svch, OCIType *objType)
   : envh_ (envh), svch_ (svch), objType_(objType)
 {
-  ociCallEnv (OCIHandleAlloc ((void *)envh, (void**)&errh_, OCI_HTYPE_ERROR, 0, (dvoid **)0), envh);
+  outFormat_ = 0;
+  ociCallEnv (OCIHandleAlloc (envh, (void**)&errh_, OCI_HTYPE_ERROR, 0, 0), envh);
 }
 
 double UdtImpl::ocidateToMsecSinceEpoch(const OCIDate *date) {
@@ -30,7 +31,10 @@ double UdtImpl::ocidateToMsecSinceEpoch(const OCIDate *date) {
   return (double)(mktime(&future) * 1000);
 }
 
-v8::Local<v8::Value> UdtImpl::primitiveToJsObj(OCITypeCode typecode, void *attr_value) {
+v8::Local<v8::Value> UdtImpl::primitiveToJsObj(OCIInd ind, OCITypeCode typecode, void *attr_value) {
+  if (ind == OCI_IND_NULL)
+    return Nan::Null();
+
   switch (typecode) {
     case OCI_TYPECODE_DATE :
       return Nan::New<v8::Date>(ocidateToMsecSinceEpoch((OCIDate *)attr_value)).ToLocalChecked();
@@ -69,17 +73,20 @@ v8::Local<v8::Value> UdtImpl::primitiveToJsObj(OCITypeCode typecode, void *attr_
   return Nan::Null();
 }
 
-v8::Local<v8::Object> UdtImpl::toJsObject(void *obj_buf, unsigned int outFormat) {
+v8::Local<v8::Value> UdtImpl::toJsObject(void *ind, void *obj_buf, unsigned int outFormat) {
   outFormat_ = outFormat;
   auto oracleObj = *(void**)obj_buf;
-  void *oracleObjNull = nullptr;
-  ociCall (OCIObjectGetInd (envh_, errh_, oracleObj, &oracleObjNull), errh_);
 
-  return toJsObject(objType_, oracleObj, oracleObjNull);
+  auto res =  toJsObject(objType_, oracleObj, ind);
+  ociCall (OCIObjectFree(envh_, errh_, oracleObj, 0), errh_);
+  return res;
 }
 
-v8::Local<v8::Object> UdtImpl::toJsObject(OCIType *tdo, void *obj_buf, void *obj_null) {
-  v8::Local<v8::Object> obj;
+v8::Local<v8::Value> UdtImpl::toJsObject(OCIType *tdo, void *obj_buf, void *obj_null) {
+  v8::Local<v8::Value> obj;
+
+  if (*(OCIInd*)obj_null == OCI_IND_NULL)
+    return Nan::Null();
 
   OCIDescribe *describeHandle = 0;
   ociCall (OCIHandleAlloc (envh_, (dvoid **)&describeHandle, OCI_HTYPE_DESCRIBE, 0, 0), errh_);
@@ -120,11 +127,6 @@ v8::Local<v8::Object> UdtImpl::toJsObject(OCIType *tdo, void *obj_buf, void *obj
         ociCall (OCIObjectGetAttr (envh_, errh_, obj_buf, obj_null, tdo, (const oratext**)&elemName, &elemNameSize, 1, 0, 0,
                                    &attr_null_status, &attr_null_struct, &attr_value, &attr_tdo), errh_);
 
-        if (attr_null_status != OCI_IND_NOTNULL) {
-          val = Nan::Null();
-          break;
-        }
-
         OCITypeCode elemTypecode;
         ociCall (OCIAttrGet (elemHandle, OCI_DTYPE_PARAM, &elemTypecode, 0, OCI_ATTR_TYPECODE, errh_), errh_);
 
@@ -134,12 +136,12 @@ v8::Local<v8::Object> UdtImpl::toJsObject(OCIType *tdo, void *obj_buf, void *obj
           val = toJsObject(attr_tdo, attr_value, attr_null_struct);
           break;
         default:
-          val = primitiveToJsObj(elemTypecode, attr_value);
+          val = primitiveToJsObj(attr_null_status, elemTypecode, attr_value);
         }
         if (obj->IsArray())
-          Nan::Set(obj, objArrIdx++, val);
+          Nan::Set(obj.As<v8::Array>(), objArrIdx++, val);
         else
-          Nan::Set(obj, key, val);
+          Nan::Set(obj.As<v8::Object>(), key, val);
       }
       break;
     }
@@ -160,7 +162,7 @@ v8::Local<v8::Object> UdtImpl::toJsObject(OCIType *tdo, void *obj_buf, void *obj
           ociCall (OCICollSize (envh_, errh_, (OCIColl*)obj_buf, &collSize), errh_);
           auto arr = Nan::New<v8::Array>(collSize);
           for (sb4 i = 0; i < collSize; i++) {
-            int exists;
+            sb4 exists;
             void *elem = nullptr, *elemNull = nullptr;
             ociCall (OCICollGetElem (envh_, errh_, (OCIColl*)obj_buf, i, &exists, &elem, &elemNull), errh_);
             if (!exists)
@@ -175,7 +177,7 @@ v8::Local<v8::Object> UdtImpl::toJsObject(OCIType *tdo, void *obj_buf, void *obj
               collElemVal = toJsObject(collElemType, elem, elemNull);
               break;
             default:
-              collElemVal = primitiveToJsObj(collElemTypecode, elem);
+              collElemVal = primitiveToJsObj(*(short*)elemNull, collElemTypecode, elem);
             }
 
             Nan::Set(arr, i, collElemVal);

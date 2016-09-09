@@ -2542,6 +2542,7 @@ void Connection::DoDefines ( eBaton* executeBaton )
             error = true;
           }
         }
+        defines[col].ind = (short*)calloc (executeBaton->maxRows, sizeof( void* ) );
         break;
       default :
         // For unsupported column types, an error is reported earlier itself
@@ -2553,8 +2554,9 @@ void Connection::DoDefines ( eBaton* executeBaton )
 
     if ( !error )
     {
-      defines[col].ind = (short*)malloc ( sizeof( short ) *
-                                          ( executeBaton->maxRows ) );
+      if (executeBaton->mInfo[col].dbType != dpi::DpiUDT)
+        defines[col].ind = (short*)malloc ( sizeof( short ) *
+                                            ( executeBaton->maxRows ) );
       if(!defines[col].ind)
       {
         executeBaton->error = NJSMessages::getErrorMsg( errInsufficientMemory );
@@ -3108,9 +3110,10 @@ Local<Value> Connection::GetValue ( eBaton *executeBaton,
     auto val = (void *) ((char *)define->buf + row * define->maxSize);
 
     Local<Value> value;
-    if (define->fetchType == dpi::DpiUDT)
-      value = define->udt->toJsObject(val, executeBaton->outFormat);
-    else
+    if (define->fetchType == dpi::DpiUDT) {
+      void* ind = ((void**)define->ind)[row];
+      value = define->udt->toJsObject(ind, val, executeBaton->outFormat);
+    } else
       value = Connection::GetValueCommon(
                              executeBaton,
                              define->ind[row],
