@@ -1,6 +1,7 @@
 #ifndef DPIUDT_ORACLE
 # define DPIUDT_ORACLE
 
+#include <node.h>
 #include <v8.h>
 
 namespace dpi
