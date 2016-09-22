@@ -86,6 +86,8 @@ class ConnImpl : public Conn
 
   virtual ~ConnImpl();
 
+  virtual std::shared_ptr<dpi::Udt> getUdt(const std::string &udtName) override;
+
   virtual void release( const string &tag, boolean retag);
 
                                 // interface properties

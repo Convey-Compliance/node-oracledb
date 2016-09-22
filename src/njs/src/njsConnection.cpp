@@ -790,6 +790,17 @@ void Connection::GetBindUnit (Local<Value> val, Bind* bind, bool array,
     NJS_GET_UINT_FROM_JSON(bind->maxArraySize, executeBaton->error, bind_unit,
                            "maxArraySize", 1, exitGetBindUnit);
 
+    if (bind->type == NJS_DATATYPE_UDT) {
+      std::string udtName;
+      NJS_GET_STRING_FROM_JSON(udtName, executeBaton->error, bind_unit,
+                               "udtName", 1, exitGetBindUnit)
+      try {
+        bind->udt = executeBaton->dpiconn->getUdt(udtName);
+      } catch(dpi::Exception &e) {
+        executeBaton->error = e.what();
+        goto exitGetBindUnit;
+      }
+    }
 
     Local<Value> element = bind_unit->Get(
                                Nan::New<v8::String>("val").ToLocalChecked());
@@ -949,6 +960,26 @@ exitGetOutBindParams:
   ;
 }
 
+void Connection::GetInBindParamsUdt(Local<Value> v8val, Bind *bind, eBaton *executeBaton) {
+  static short IND_NULL = -1, IND_NOT_NULL = 0;
+  bind->ind = (short *)malloc (sizeof(void*));
+  bind->len = (DPI_BUFLEN_TYPE *)malloc (sizeof(DPI_BUFLEN_TYPE));
+  bind->type = dpi::DpiUDT;
+  bind->maxSize = *bind->len = sizeof(void*);
+  bind->value = malloc(*bind->len);
+  if (v8val->IsNull()) {
+    *(void**)bind->ind = &IND_NULL;
+    *(void**)bind->value = NULL;
+  } else {
+    *(void**)bind->ind = &IND_NOT_NULL;
+    try {
+      *(void**)bind->value = bind->udt->jsToOci(Local<Object>::Cast(v8val));
+    } catch(dpi::Exception &e) {
+      executeBaton->error = e.what();
+    }
+  }
+  executeBaton->binds.push_back(bind);
+}
 
 /*****************************************************************************/
 /*
@@ -967,7 +998,11 @@ void Connection::GetInBindParams(Local<Value> v8val, Bind* bind,
 {
   Nan::HandleScope scope;
 
-  if (v8val->IsArray() )
+  if (bind->type == NJS_DATATYPE_UDT)
+  {
+    GetInBindParamsUdt(v8val, bind, executeBaton);
+  }
+  else if (v8val->IsArray() )
   {
     GetInBindParamsArray(Local<Array>::Cast(v8val), bind, executeBaton );
   }
@@ -1915,6 +1950,7 @@ void Connection::PrepareAndBind (eBaton* executeBaton)
               (executeBaton->stmtIsReturning &&
                 executeBaton->binds[index]->isOut) ?
               (void *)executeBaton : NULL,
+              executeBaton->binds[index]->udt.get(),
               (executeBaton->stmtIsReturning &&
                 executeBaton->binds[index]->isOut) ?
               Connection::cbDynBufferGet : NULL);
@@ -1964,6 +2000,7 @@ void Connection::PrepareAndBind (eBaton* executeBaton)
               (executeBaton->stmtIsReturning &&
                 executeBaton->binds[index]->isOut ) ?
                   (void *)executeBaton : NULL,
+              executeBaton->binds[index]->udt.get(),
               (executeBaton->stmtIsReturning &&
                 executeBaton->binds[index]->isOut) ?
               Connection::cbDynBufferGet : NULL);

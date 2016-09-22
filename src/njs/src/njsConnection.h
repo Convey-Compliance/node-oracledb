@@ -55,6 +55,7 @@
 #include <node.h>
 #include <string>
 #include <vector>
+#include <memory>
 #include "dpi.h"
 #include "njsUtils.h"
 #include "njsOracle.h"
@@ -88,6 +89,7 @@ typedef struct Bind
   unsigned int        rowsReturned;     /* number rows returned for
                                            the bind (DML RETURNING) */
   dpi::DateTimeArray* dttmarr;
+  std::shared_ptr<Udt> udt;
 
   Bind () : key(""), value(NULL), extvalue (NULL), len(NULL), len2(NULL),
             maxSize(0), type(0), ind(NULL), isOut(false), isInOut(false),
@@ -428,6 +430,7 @@ private:
   static void GetInBindParams(Local<Value> v8val, Bind *bind, eBaton *executeBaton);
   static void GetInBindParamsScalar(Local<Value> v8val, Bind *bind, eBaton *executeBaton);
   static void GetInBindParamsArray(Local<Array> v8vals, Bind *bind, eBaton *executeBaton);
+  static void GetInBindParamsUdt(Local<Value> v8val, Bind *bind, eBaton *executeBaton);
   static bool AllocateBindArray(unsigned short dataType, Bind* bind, eBaton *executeBaton, size_t *arrayElementSize);
 
   static void GetOutBindParams (unsigned short dataType, Bind* bind,

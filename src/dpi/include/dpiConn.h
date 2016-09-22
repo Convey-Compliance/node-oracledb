@@ -35,6 +35,7 @@
 
 
 #include <string>
+#include <memory>
 
 
 using std::string;
@@ -64,6 +65,7 @@ typedef enum
 class Conn
 {
 public:
+  virtual std::shared_ptr<dpi::Udt> getUdt(const std::string &udtName) = 0;
                                 // termination
 
   virtual void release( const string &tag = "", boolean retag = false ) = 0;

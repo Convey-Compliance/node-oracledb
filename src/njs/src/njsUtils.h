@@ -69,7 +69,8 @@ typedef enum
   NJS_DATATYPE_CURSOR   = 2004,
   NJS_DATATYPE_BUFFER   = 2005,
   NJS_DATATYPE_CLOB     = 2006,
-  NJS_DATATYPE_BLOB     = 2007
+  NJS_DATATYPE_BLOB     = 2007,
+  NJS_DATATYPE_UDT      = 2008
 }DataType;
 
 // User specified bind types.

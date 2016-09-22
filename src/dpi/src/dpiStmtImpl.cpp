@@ -254,19 +254,23 @@ void StmtImpl::prefetchRows (unsigned int prefetchRows)
 void StmtImpl::bind (unsigned int pos, unsigned short type, void *buf,
                      DPI_SZ_TYPE bufSize, short *ind, DPI_BUFLEN_TYPE *bufLen,
                      unsigned int maxarr_len, unsigned int *curelen,
-                     void *data, cbtype cb)
+                     void *data, dpi::Udt *udt, cbtype cb)
 {
   OCIBind *b = (OCIBind *)0;
 
-  ociCall (DPIBINDBYPOS (stmth_, &b, errh_, pos,
-                         (cb ? NULL : (type==DpiRSet) ?
-                           (void *)&(((StmtImpl*)buf)->stmth_) : buf),
-                         (type == DpiRSet) ? 0 : bufSize, type,
-                         (cb ? NULL : ind),
-                         (cb ? NULL : bufLen),
-                         NULL, maxarr_len, curelen,
-                         (cb) ? OCI_DATA_AT_EXEC : OCI_DEFAULT),
-           errh_);
+  if (type == dpi::DpiUDT) {
+    ociCall (DPIBINDBYPOS (stmth_, &b, errh_, pos, 0, 0, type, 0, 0, NULL, 0, 0, OCI_DEFAULT), errh_);
+    ociCall(OCIBindObject(b, errh_, ((UdtImpl *)udt)->getType(), (void**)buf, 0, (void**)ind, 0), errh_);
+  } else
+    ociCall (DPIBINDBYPOS (stmth_, &b, errh_, pos,
+                           (cb ? NULL : (type==DpiRSet) ?
+                             (void *)&(((StmtImpl*)buf)->stmth_) : buf),
+                           (type == DpiRSet) ? 0 : bufSize, type,
+                           (cb ? NULL : ind),
+                           (cb ? NULL : bufLen),
+                           NULL, maxarr_len, curelen,
+                           (cb) ? OCI_DATA_AT_EXEC : OCI_DEFAULT),
+             errh_);
 
   if ( cb )
   {
@@ -310,19 +314,24 @@ void StmtImpl::bind (const unsigned char *name, int nameLen,
                      short *ind, DPI_BUFLEN_TYPE *bufLen,
                      unsigned int maxarr_len, unsigned int *curelen,
                      void *data,
+                     dpi::Udt *udt,
                      cbtype cb)
 {
   OCIBind *b = (OCIBind *)0;
+  if (type == dpi::DpiUDT) {
+    ociCall (DPIBINDBYNAME (stmth_, &b, errh_, name, nameLen, 0, 0, type, 0, 0, NULL, 0, 0, OCI_DEFAULT), errh_);
+    ociCall(OCIBindObject(b, errh_, ((UdtImpl *)udt)->getType(), (void**)buf, 0, (void**)ind, 0), errh_);
+  } else
+    ociCall (DPIBINDBYNAME (stmth_, &b, errh_, name, nameLen,
+                        (cb ? NULL : (type == DpiRSet) ?
+                          (void *)&((StmtImpl*)buf)->stmth_: buf),
+                        (type == DpiRSet) ? 0 : bufSize, type,
+                        (cb ? NULL : ind),
+                        (cb ? NULL : bufLen),
+                        NULL,
+                        maxarr_len, curelen,
+                        (cb) ? OCI_DATA_AT_EXEC : OCI_DEFAULT), errh_);
 
-  ociCall (DPIBINDBYNAME (stmth_, &b, errh_, name, nameLen,
-                          (cb ? NULL : (type == DpiRSet) ?
-                            (void *)&((StmtImpl*)buf)->stmth_: buf),
-                          (type == DpiRSet) ? 0 : bufSize, type,
-                          (cb ? NULL : ind),
-                          (cb ? NULL : bufLen),
-                          NULL,
-                          maxarr_len, curelen,
-                          (cb) ? OCI_DATA_AT_EXEC : OCI_DEFAULT), errh_);
   if ( cb )
   {
     DpiCallbackCtx *cbCtx = (DpiCallbackCtx *)malloc(sizeof(DpiCallbackCtx));
@@ -419,16 +428,13 @@ void StmtImpl::define (unsigned int pos, unsigned short type, void *buf,
     text *defineName = NULL;
     ub4 defineNameSize = 0;
     ociCall (OCIAttrGet (stmtDesc, OCI_DTYPE_PARAM, &defineName, &defineNameSize, OCI_ATTR_TYPE_NAME, errh_), errh_);
+    std::string utdTypeName((char*)defineName, defineNameSize);
 
-    OCIType *objType;
-    ociCall (OCITypeByName (envh_, errh_, svch_, NULL, 0, defineName, defineNameSize, NULL, 0,
-    OCI_DURATION_SESSION, OCI_TYPEGET_HEADER, &objType), errh_);
-
-    auto udtImpl = new UdtImpl(envh_, svch_, objType);
+    auto udtImpl = new UdtImpl(envh_, svch_, utdTypeName);
     udt = udtImpl;
 
     ociCall (DPIDEFINEBYPOS (stmth_, &d, errh_, pos, NULL, 0, type, NULL, NULL, NULL, OCI_DEFAULT), errh_);
-    ociCall (OCIDefineObject (d, errh_, objType, (void**)buf, 0, (void **)ind, 0), errh_);
+    ociCall (OCIDefineObject (d, errh_, udtImpl->getType(), (void**)buf, 0, (void **)ind, 0), errh_);
     return;
   }
 

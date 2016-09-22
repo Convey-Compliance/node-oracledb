@@ -25,6 +25,22 @@ describe('67 udt.js', function() {
     e_type_missing EXCEPTION;
     PRAGMA EXCEPTION_INIT(e_type_missing, -04043);
   BEGIN
+    EXECUTE IMMEDIATE('DROP TYPE test_udt_str_table');
+  EXCEPTION
+    WHEN e_type_missing THEN NULL;
+  END;
+  DECLARE
+    e_type_missing EXCEPTION;
+    PRAGMA EXCEPTION_INIT(e_type_missing, -04043);
+  BEGIN
+    EXECUTE IMMEDIATE('DROP TYPE test_udt_nested_str_kvp_table');
+  EXCEPTION
+    WHEN e_type_missing THEN NULL;
+  END;
+  DECLARE
+    e_type_missing EXCEPTION;
+    PRAGMA EXCEPTION_INIT(e_type_missing, -04043);
+  BEGIN
     EXECUTE IMMEDIATE('DROP TYPE test_udt_str_kvp_table');
   EXCEPTION
     WHEN e_type_missing THEN NULL;
@@ -76,22 +92,36 @@ describe('67 udt.js', function() {
     CREATE TYPE test_udt_num_table AS TABLE OF number
   ');
   EXECUTE IMMEDIATE('
+    CREATE TYPE test_udt_str_table AS TABLE OF VARCHAR2(200)
+  ');
+  EXECUTE IMMEDIATE('
     CREATE TYPE test_udt_str_kvp_table AS TABLE OF test_udt_str_kvp
+  ');
+  EXECUTE IMMEDIATE('
+    CREATE TYPE test_udt_nested_str_kvp_table AS TABLE OF test_udt_str_kvp_nested
   ');
   EXECUTE IMMEDIATE('
     CREATE TABLE test_udt(
         id NUMBER,
-        kvp test_udt_str_kvp,
         primitives test_udt_primitives,
+        kvp test_udt_str_kvp,
         kvp_nested test_udt_str_kvp_nested,
-        tab test_udt_str_kvp_table
+        num_tab test_udt_num_table,
+        str_tab test_udt_str_table,
+        tab test_udt_str_kvp_table,
+        nested_tab test_udt_nested_str_kvp_table
     )
-    NESTED TABLE tab STORE AS test_udt_tab
+    NESTED TABLE num_tab STORE AS test_udt_num_tab,
+    NESTED TABLE str_tab STORE AS test_udt_str_tab,
+    NESTED TABLE tab STORE AS test_udt_tab,
+    NESTED TABLE nested_tab STORE AS test_udt_nested_tab
   ');
   END;`;
   const dropQuery = `BEGIN
     EXECUTE IMMEDIATE('DROP TABLE test_udt');
     EXECUTE IMMEDIATE('DROP TYPE test_udt_num_table');
+    EXECUTE IMMEDIATE('DROP TYPE test_udt_str_table');
+    EXECUTE IMMEDIATE('DROP TYPE test_udt_nested_str_kvp_table');
     EXECUTE IMMEDIATE('DROP TYPE test_udt_str_kvp_table');
     EXECUTE IMMEDIATE('DROP TYPE test_udt_str_kvp_nested');
     EXECUTE IMMEDIATE('DROP TYPE test_udt_str_kvp');
@@ -316,5 +346,370 @@ describe('67 udt.js', function() {
       })
     })
   })
+
+  describe('67.2 IN bind', function() {
+    beforeEach(function (done) {
+      connection.execute("delete from test_udt", function(err) {
+        should.not.exist(err);
+        done();
+      });
+    })
+
+    it('67.2.1 primitives', function(done) {
+      connection.should.be.ok();
+
+      const PRIMITIVES_OBJ = { NUM: 777, DATEVAL: testDate, RAWVAL: new Buffer('0A', 'hex') };
+      connection.execute("insert into test_udt(primitives) values(:p)",
+        {
+          p: {
+            type: oracledb.UDT,
+            dir: oracledb.BIND_IN,
+            val: PRIMITIVES_OBJ,
+            udtName: 'TEST_UDT_PRIMITIVES'
+          }
+        },
+        function (err, result) {
+          should.not.exist(err);
+
+          result.rowsAffected.should.be.exactly(1);
+          connection.execute("SELECT primitives FROM test_udt", [], { outFormat: oracledb.OBJECT }, function (err, result) {
+            should.not.exist(err);
+
+            should.exist(result.rows);
+            result.rows.length.should.be.exactly(1);
+            should.deepEqual(result.rows[0], { PRIMITIVES: PRIMITIVES_OBJ });
+            done();
+          });
+        }
+      );
+    });
+
+    it('67.2.2 nested object', function(done) {
+      connection.should.be.ok();
+
+      const OBJ = { KEY: 'root key', VALUE: { KEY: 'nested key', VALUE: 'nested value' } };
+      connection.execute("insert into test_udt(kvp_nested) values(:obj)",
+        {
+          obj: {
+            type: oracledb.UDT,
+            dir: oracledb.BIND_IN,
+            val: OBJ,
+            udtName: 'TEST_UDT_STR_KVP_NESTED'
+          }
+        },
+        function (err, result) {
+          should.not.exist(err);
+
+          result.rowsAffected.should.be.exactly(1);
+          connection.execute("SELECT kvp_nested FROM test_udt", [], { outFormat: oracledb.OBJECT }, function (err, result) {
+            should.not.exist(err);
+
+            should.exist(result.rows);
+            result.rows.length.should.be.exactly(1);
+            should.deepEqual(result.rows[0], { KVP_NESTED: OBJ });
+            done();
+          });
+        }
+      );
+    });
+
+    describe('67.2.3 nested table', function() {
+      it('67.2.3.1 array of primitives', function(done) {
+        connection.should.be.ok();
+
+        const NUM_ARR = [45, 30, 67], STR_ARR = ["first", "second"];
+        connection.execute("insert into test_udt(num_tab, str_tab) values(:nums, :strs)",
+          {
+            nums: {
+              type: oracledb.UDT,
+              dir: oracledb.BIND_IN,
+              val: NUM_ARR,
+              udtName: 'TEST_UDT_NUM_TABLE'
+            },
+            strs: {
+              type: oracledb.UDT,
+              dir: oracledb.BIND_IN,
+              val: STR_ARR,
+              udtName: 'TEST_UDT_STR_TABLE'
+            }
+          },
+          function (err, result) {
+            should.not.exist(err);
+
+            result.rowsAffected.should.be.exactly(1);
+            connection.execute("SELECT num_tab, str_tab FROM test_udt", [], { outFormat: oracledb.OBJECT }, function (err, result) {
+              should.not.exist(err);
+
+              should.exist(result.rows);
+              result.rows.length.should.be.exactly(1);
+              should.deepEqual(result.rows[0], { NUM_TAB: NUM_ARR, STR_TAB: STR_ARR });
+              done();
+            });
+          }
+        );
+      });
+
+      it('67.2.3.2 array of objects', function (done) {
+        connection.should.be.ok();
+
+        const OBJ_ARR = [{ KEY: "key1", VALUE: "val1" }, { KEY: "key2", VALUE: "val2" }];
+        connection.execute("insert into test_udt(tab) values(:tab)",
+          {
+            tab: {
+              type: oracledb.UDT,
+              dir: oracledb.BIND_IN,
+              val: OBJ_ARR,
+              udtName: 'TEST_UDT_STR_KVP_TABLE'
+            }
+          },
+          function (err, result) {
+            should.not.exist(err);
+
+            result.rowsAffected.should.be.exactly(1);
+            connection.execute("SELECT tab FROM test_udt", [], { outFormat: oracledb.OBJECT },
+              function (err, result) {
+                should.not.exist(err);
+
+                should.exist(result.rows);
+                result.rows.length.should.be.exactly(1);
+                should.deepEqual(result.rows[0], { TAB: OBJ_ARR });
+                done();
+              }
+            );
+          }
+        );
+      });
+
+      it('67.2.3.3 array of nested objects', function (done) {
+        connection.should.be.ok();
+
+        const OBJ_ARR = [{ KEY: "key1", VALUE: { KEY: "nested key 1", VALUE: "val1" } },
+                         { KEY: "key2", VALUE: { KEY: "nested key 2", VALUE: "val2" } }];
+        connection.execute("insert into test_udt(nested_tab) values(:objs)",
+          {
+            objs: {
+              type: oracledb.UDT,
+              dir: oracledb.BIND_IN,
+              val: OBJ_ARR,
+              udtName: 'TEST_UDT_NESTED_STR_KVP_TABLE'
+            }
+          },
+          function (err, result) {
+            should.not.exist(err);
+
+            result.rowsAffected.should.be.exactly(1);
+            connection.execute("SELECT nested_tab FROM test_udt", [], { outFormat: oracledb.OBJECT },
+              function (err, result) {
+                should.not.exist(err);
+
+                should.exist(result.rows);
+                result.rows.length.should.be.exactly(1);
+                should.deepEqual(result.rows[0], { NESTED_TAB: OBJ_ARR });
+                done();
+              }
+            );
+          }
+        );
+      });
+    });
+
+    it('67.2.4 null', function(done) {
+      connection.should.be.ok();
+
+      connection.execute("insert into test_udt(kvp_nested) values(:obj)",
+        {
+          obj: {
+            type: oracledb.UDT,
+            dir: oracledb.BIND_IN,
+            val: null,
+            udtName: 'TEST_UDT_STR_KVP_NESTED'
+          }
+        },
+        function (err, result) {
+          should.not.exist(err);
+
+          result.rowsAffected.should.be.exactly(1);
+          connection.execute("SELECT kvp_nested FROM test_udt", [], { outFormat: oracledb.OBJECT }, function (err, result) {
+            should.not.exist(err);
+
+            should.exist(result.rows);
+            result.rows.length.should.be.exactly(1);
+            should.deepEqual(result.rows[0], { KVP_NESTED: null });
+            done();
+          });
+        }
+      );
+    });
+
+    it('67.2.5 udtName is not provided - error expected', function(done) {
+      connection.should.be.ok();
+
+      connection.execute("insert into test_udt(id) values(:id)",
+        {
+          id: {
+            type: oracledb.UDT,
+            dir: oracledb.BIND_IN,
+            val: 1
+          }
+        },
+        function (err, result) {
+          err.message.should.containEql('udtName option required for UDT binds');
+          done();
+        }
+      );
+    });
+
+    it('67.2.6 invalid udtName provided - error expected', function(done) {
+      connection.should.be.ok();
+
+      connection.execute("insert into test_udt(num_tab) values(:nums)",
+        {
+          nums: {
+            type: oracledb.UDT,
+            dir: oracledb.BIND_IN,
+            val: [1, 2],
+            udtName: 'INVALID'
+          }
+        },
+        function (err, result) {
+          err.message.should.containEql('"INVALID" not found');
+          done();
+        }
+      );
+    });
+
+    it('67.2.7 val doesnt match udtName - error expected', function(done) {
+      connection.should.be.ok();
+
+      connection.execute("insert into test_udt(num_tab) values(:nums)",
+        {
+          nums: {
+            type: oracledb.UDT,
+            dir: oracledb.BIND_IN,
+            val: ['test', 'some string'],
+            udtName: 'TEST_UDT_NUM_TABLE'
+          }
+        },
+        function (err, result) {
+          err.message.should.containEql('number value required for UDT bind');
+          done();
+        }
+      );
+    });
+
+    it('67.2.8 nested val doesnt match oracle - extra fields ignored, missing becomes null', function(done) {
+      connection.should.be.ok();
+
+      connection.execute("insert into test_udt(tab) values(:tab)",
+        {
+          tab: {
+            type: oracledb.UDT,
+            dir: oracledb.BIND_IN,
+            val: [{ KEY: "k", EXTRA_FIELD: "extra" }],
+            udtName: 'TEST_UDT_STR_KVP_TABLE'
+          }
+        },
+        function (err, result) {
+          should.not.exist(err);
+
+          result.rowsAffected.should.be.exactly(1);
+          connection.execute("SELECT tab FROM test_udt", [], { outFormat: oracledb.OBJECT }, function (err, result) {
+            should.not.exist(err);
+
+            should.exist(result.rows);
+            result.rows.length.should.be.exactly(1);
+            should.deepEqual(result.rows[0], { TAB: [ { KEY: 'k', VALUE: null } ] });
+            done();
+          });
+        }
+      );
+    });
+
+    it('67.2.9 val fields are case insensitive', function(done) {
+      connection.should.be.ok();
+
+      connection.execute("insert into test_udt(kvp) values(:kvp)",
+        {
+          kvp: {
+            type: oracledb.UDT,
+            dir: oracledb.BIND_IN,
+            val: { kEy: "k", ValuE: "v" },
+            udtName: 'TEST_UDT_STR_KVP'
+          }
+        },
+        function (err, result) {
+          should.not.exist(err);
+
+          result.rowsAffected.should.be.exactly(1);
+          connection.execute("SELECT kvp FROM test_udt", [], { outFormat: oracledb.OBJECT }, function (err, result) {
+            should.not.exist(err);
+
+            should.exist(result.rows);
+            result.rows.length.should.be.exactly(1);
+            should.deepEqual(result.rows[0], { KVP: { KEY: 'k', VALUE: 'v' } });
+            done();
+          });
+        }
+      );
+    });
+
+    it('67.2.10 val datatype is invalid - error expected', function(done) {
+      connection.should.be.ok();
+
+      connection.execute("insert into test_udt(num_tab) values(:nums)",
+        {
+          nums: {
+            type: oracledb.UDT,
+            dir: oracledb.BIND_IN,
+            val: 666,
+            udtName: 'TEST_UDT_NUM_TABLE'
+          }
+        },
+        function (err, result) {
+          err.message.should.containEql('only js array or object allowed for UDT binds');
+          done();
+        }
+      );
+    });
+
+    it('67.2.11 val datatype doesnt match oracle - error expected', function(done) {
+      connection.should.be.ok();
+
+      connection.execute("insert into test_udt(num_tab) values(:nums)",
+        {
+          nums: {
+            type: oracledb.UDT,
+            dir: oracledb.BIND_IN,
+            val: {a: 1},
+            udtName: 'TEST_UDT_NUM_TABLE'
+          }
+        },
+        function (err, result) {
+          err.message.should.containEql('js object binding possible only to oracle user defined datatype');
+          done();
+        }
+      );
+    });
+
+    it('67.2.12 duplicated case-insensitive fields in js obj - error expected', function(done) {
+      connection.should.be.ok();
+
+      connection.execute("insert into test_udt(kvp) values(:kvp)",
+        {
+          kvp: {
+            type: oracledb.UDT,
+            dir: oracledb.BIND_IN,
+            val: {key: "a", KeY: "b"},
+            udtName: 'TEST_UDT_STR_KVP'
+          }
+        },
+        function (err, result) {
+          err.message.should.containEql('Js object contains duplicated case-insensitive fields key and KeY');
+          done();
+        }
+      );
+    });
+
+  });
 
 })

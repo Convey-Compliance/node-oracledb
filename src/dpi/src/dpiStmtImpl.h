@@ -78,7 +78,7 @@ public:
   virtual void bind (unsigned int pos, unsigned short type, void *buf,
                      DPI_SZ_TYPE bufSize, short *ind, DPI_BUFLEN_TYPE *bufLen,
                      unsigned int maxarr_len, unsigned int *curelen,
-                     void *data, cbtype cb);
+                     void *data, dpi::Udt *udt, cbtype cb);
 
   virtual void bind (const unsigned char *name, int nameLen,
                      unsigned int bndpos,
@@ -86,6 +86,7 @@ public:
                      short *ind, DPI_BUFLEN_TYPE *bufLen,
                      unsigned int maxarr_len, unsigned int *curelen,
                      void *data,
+                     dpi::Udt *udt,
                      cbtype cb);
 
   virtual void execute ( int numIterations, bool autoCommit );
