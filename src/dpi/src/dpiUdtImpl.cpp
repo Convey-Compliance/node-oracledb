@@ -56,7 +56,7 @@ OCIDate UdtImpl::msecSinceEpochToOciDate(double msec) {
   return date;
 }
 
-v8::Local<v8::Value> UdtImpl::primitiveToJsObj(OCIInd ind, OCITypeCode typecode, void *attr_value) {
+v8::Local<v8::Value> UdtImpl::ociValToJsVal(OCIInd ind, OCITypeCode typecode, void *attr_value) {
   if (ind == OCI_IND_NULL)
     return Nan::Null();
 
@@ -98,17 +98,17 @@ v8::Local<v8::Value> UdtImpl::primitiveToJsObj(OCIInd ind, OCITypeCode typecode,
   return Nan::Null();
 }
 
-v8::Local<v8::Value> UdtImpl::toJsObject(void *ind, void *obj_buf, unsigned int outFormat) {
+v8::Local<v8::Value> UdtImpl::ociToJs(void *ind, void *obj_buf, unsigned int outFormat) {
   outFormat_ = outFormat;
   auto oracleObj = *(void**)obj_buf;
 
-  auto res =  toJsObject(objType_, oracleObj, ind);
+  auto res =  ociToJs(objType_, oracleObj, ind);
   if (oracleObj)
     ociCall (OCIObjectFree(envh_, errh_, oracleObj, 0), errh_);
   return res;
 }
 
-v8::Local<v8::Value> UdtImpl::toJsObject(OCIType *tdo, void *obj_buf, void *obj_null) {
+v8::Local<v8::Value> UdtImpl::ociToJs(OCIType *tdo, void *obj_buf, void *obj_null) {
   v8::Local<v8::Value> obj;
 
   if (*(OCIInd*)obj_null == OCI_IND_NULL)
@@ -159,10 +159,10 @@ v8::Local<v8::Value> UdtImpl::toJsObject(OCIType *tdo, void *obj_buf, void *obj_
         switch (elemTypecode) {
         case OCI_TYPECODE_NAMEDCOLLECTION:
         case OCI_TYPECODE_OBJECT:
-          val = toJsObject(attr_tdo, attr_value, attr_null_struct);
+          val = ociToJs(attr_tdo, attr_value, attr_null_struct);
           break;
         default:
-          val = primitiveToJsObj(attr_null_status, elemTypecode, attr_value);
+          val = ociValToJsVal(attr_null_status, elemTypecode, attr_value);
         }
         if (obj->IsArray())
           Nan::Set(obj.As<v8::Array>(), objArrIdx++, val);
@@ -200,10 +200,10 @@ v8::Local<v8::Value> UdtImpl::toJsObject(OCIType *tdo, void *obj_buf, void *obj_
             switch (collElemTypecode) {
             case OCI_TYPECODE_NAMEDCOLLECTION:
             case OCI_TYPECODE_OBJECT:
-              collElemVal = toJsObject(collElemType, elem, elemNull);
+              collElemVal = ociToJs(collElemType, elem, elemNull);
               break;
             default:
-              collElemVal = primitiveToJsObj(*(short*)elemNull, collElemTypecode, elem);
+              collElemVal = ociValToJsVal(*(short*)elemNull, collElemTypecode, elem);
             }
 
             Nan::Set(arr, i, collElemVal);
