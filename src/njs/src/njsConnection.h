@@ -111,10 +111,10 @@ typedef struct Define
   DPI_BUFLEN_TYPE    *len;
   short              *ind;
   dpi::DateTimeArray *dttmarr;   // DPI Date time array of descriptor
-  Udt                *udt;
+  shared_ptr<Udt>    udt;
 
   Define () :fetchType(0), maxSize(0), buf(NULL), extbuf(NULL),
-             len(0), ind(0), dttmarr(NULL), udt(NULL)
+             len(0), ind(0), dttmarr(NULL)
   {}
 } Define;
 

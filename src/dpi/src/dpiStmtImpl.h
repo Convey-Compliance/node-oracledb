@@ -92,7 +92,7 @@ public:
   virtual void execute ( int numIterations, bool autoCommit );
 
   virtual void define (unsigned int pos, unsigned short type, void *buf,
-                       DPI_SZ_TYPE bufSize, short *ind, DPI_BUFLEN_TYPE *bufLen, dpi::Udt *&udt);
+                       DPI_SZ_TYPE bufSize, short *ind, DPI_BUFLEN_TYPE *bufLen, std::shared_ptr<dpi::Udt> &udt);
   virtual void fetch (unsigned int numRows = 1);
 
 

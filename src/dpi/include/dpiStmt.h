@@ -39,6 +39,7 @@
 
 
 #include <string>
+#include <memory>
 
 using std::string;
 
@@ -199,7 +200,7 @@ public:
   virtual void execute ( int numIterations, bool autoCommit = false) = 0;
 
   virtual void define(unsigned int pos, unsigned short type, void *buf,
-                      DPI_SZ_TYPE bufSize, short *ind, DPI_BUFLEN_TYPE *bufLen, dpi::Udt *&udt) = 0;
+                      DPI_SZ_TYPE bufSize, short *ind, DPI_BUFLEN_TYPE *bufLen, std::shared_ptr<dpi::Udt> &udt) = 0;
 
   virtual void fetch(unsigned int numRows = 1) = 0;
 

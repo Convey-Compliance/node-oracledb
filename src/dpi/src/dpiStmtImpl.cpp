@@ -417,7 +417,7 @@ void StmtImpl::release ()
     -None-
 */
 void StmtImpl::define (unsigned int pos, unsigned short type, void *buf,
-                       DPI_SZ_TYPE bufSize, short *ind, DPI_BUFLEN_TYPE *bufLen, dpi::Udt *&udt)
+                       DPI_SZ_TYPE bufSize, short *ind, DPI_BUFLEN_TYPE *bufLen, std::shared_ptr<dpi::Udt> &udt)
 {
   OCIDefine *d = (OCIDefine *)0;
 
@@ -431,7 +431,7 @@ void StmtImpl::define (unsigned int pos, unsigned short type, void *buf,
     std::string utdTypeName((char*)defineName, defineNameSize);
 
     auto udtImpl = new UdtImpl(envh_, svch_, utdTypeName);
-    udt = udtImpl;
+    udt.reset(udtImpl);
 
     ociCall (DPIDEFINEBYPOS (stmth_, &d, errh_, pos, NULL, 0, type, NULL, NULL, NULL, OCI_DEFAULT), errh_);
     ociCall (OCIDefineObject (d, errh_, udtImpl->getType(), (void**)buf, 0, (void **)ind, 0), errh_);
