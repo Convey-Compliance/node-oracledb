@@ -587,7 +587,7 @@ describe('67 udt.js', function() {
             type: oracledb.UDT,
             dir: oracledb.BIND_IN,
             val: ['test', 'some string'],
-            udtName: 'TEST_UDT_NUM_TABLE'
+            udtName: 'test_udt_num_table'
           }
         },
         function (err, result) {

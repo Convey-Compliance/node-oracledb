@@ -11,7 +11,7 @@ class Udt
 {
 public:
   virtual ~Udt() {};
-  virtual v8::Local<v8::Value> ociToJs(void *ind, void *obj_buf, unsigned int outFormat) = 0;
+  virtual v8::Local<v8::Value> ociToJs(void *ociVal, void *ociValNullStruct, unsigned int outFormat) = 0;
   virtual void * jsToOci(v8::Local<v8::Object> jsObj) = 0;
 };
 

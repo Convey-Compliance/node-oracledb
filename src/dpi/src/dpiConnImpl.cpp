@@ -177,7 +177,7 @@ ConnImpl::~ConnImpl()
 
 std::shared_ptr<dpi::Udt> ConnImpl::getUdt(const std::string &udtName) {
   if (udtName.empty())
-    throw ExceptionImpl("", 0, "udtName option required for UDT binds");
+    throw UdtException("udtName option required for UDT binds");
   return std::make_shared<UdtImpl>(envh_, svch_, errh_, udtName);
 }
 

@@ -3148,8 +3148,9 @@ Local<Value> Connection::GetValue ( eBaton *executeBaton,
 
     Local<Value> value;
     if (define->fetchType == dpi::DpiUDT) {
-      void* ind = ((void**)define->ind)[row];
-      value = define->udt->ociToJs(ind, val, executeBaton->outFormat);
+      auto ociObj = *(void**)val;
+      void* ociObjNullStruct = ((void**)define->ind)[row];
+      value = define->udt->ociToJs(ociObj, ociObjNullStruct, executeBaton->outFormat);
     } else
       value = Connection::GetValueCommon(
                              executeBaton,
