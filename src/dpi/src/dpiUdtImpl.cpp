@@ -11,14 +11,12 @@ extern "C" {
 }
 #include "nan.h"
 
-
 using namespace dpi;
 
-UdtImpl::UdtImpl (OCIEnv *envh, OCISvcCtx *svch, const std::string &objTypeName)
-  : envh_ (envh), svch_ (svch)
+UdtImpl::UdtImpl (OCIEnv *envh, OCISvcCtx *svch, OCIError *errh, const std::string &objTypeName)
+  : envh_ (envh), svch_ (svch), errh_(errh)
 {
   outFormat_ = 0;
-  ociCallEnv (OCIHandleAlloc (envh, (void**)&errh_, OCI_HTYPE_ERROR, 0, 0), envh);
 
   ociCall (OCITypeByName (envh_, errh_, svch_, NULL, 0, (oratext*)objTypeName.c_str(), (ub4)objTypeName.size(), NULL, 0,
                           OCI_DURATION_SESSION, OCI_TYPEGET_HEADER, &objType_), errh_);

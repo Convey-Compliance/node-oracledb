@@ -430,11 +430,10 @@ void StmtImpl::define (unsigned int pos, unsigned short type, void *buf,
     ociCall (OCIAttrGet (stmtDesc, OCI_DTYPE_PARAM, &defineName, &defineNameSize, OCI_ATTR_TYPE_NAME, errh_), errh_);
     std::string utdTypeName((char*)defineName, defineNameSize);
 
-    auto udtImpl = new UdtImpl(envh_, svch_, utdTypeName);
-    udt.reset(udtImpl);
+    udt = conn_->getUdt(utdTypeName);
 
     ociCall (DPIDEFINEBYPOS (stmth_, &d, errh_, pos, NULL, 0, type, NULL, NULL, NULL, OCI_DEFAULT), errh_);
-    ociCall (OCIDefineObject (d, errh_, udtImpl->getType(), (void**)buf, 0, (void **)ind, 0), errh_);
+    ociCall (OCIDefineObject (d, errh_, ((UdtImpl*)udt.get())->getType(), (void**)buf, 0, (void **)ind, 0), errh_);
     return;
   }
 
