@@ -961,23 +961,18 @@ exitGetOutBindParams:
 }
 
 void Connection::GetInBindParamsUdt(Local<Value> v8val, Bind *bind, eBaton *executeBaton) {
-  static short IND_NULL = -1, IND_NOT_NULL = 0;
   bind->ind = (short *)malloc (sizeof(void*));
   bind->len = (DPI_BUFLEN_TYPE *)malloc (sizeof(DPI_BUFLEN_TYPE));
   bind->type = dpi::DpiUDT;
   bind->maxSize = *bind->len = sizeof(void*);
   bind->value = malloc(*bind->len);
-  if (v8val->IsNull()) {
-    *(void**)bind->ind = &IND_NULL;
-    *(void**)bind->value = NULL;
-  } else {
-    *(void**)bind->ind = &IND_NOT_NULL;
-    try {
-      *(void**)bind->value = bind->udt->jsToOci(Local<Object>::Cast(v8val));
-    } catch(dpi::Exception &e) {
-      executeBaton->error = e.what();
-    }
+
+  try {
+    *(void**)bind->value = bind->udt->jsToOci(Local<Object>::Cast(v8val), *(void**)bind->ind);
+  } catch(dpi::Exception &e) {
+    executeBaton->error = e.what();
   }
+
   executeBaton->binds.push_back(bind);
 }
 

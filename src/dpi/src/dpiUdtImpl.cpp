@@ -226,8 +226,8 @@ v8::Local<v8::Value> UdtImpl::ociToJs(void *ociVal, OCIType *ociValTdo, OCIInd *
   return jsObj;
 }
 
-void * UdtImpl::jsToOci(v8::Local<v8::Object> jsObj) {
-  return jsToOci(jsObj, objType_);
+void * UdtImpl::jsToOci(v8::Local<v8::Object> jsObj, void *&ind) {
+  return jsToOci(jsObj, objType_, (OCIInd*&)ind);
 }
 
 void * UdtImpl::jsPrimitiveToOciPrimitive(v8::Local<v8::Value> jsPrimitive, OCITypeCode ociPrimitiveTypecode) {
@@ -327,17 +327,21 @@ void UdtImpl::jsArrToOciNestedTable(v8::Local<v8::Array> jsArr, OCIColl *ociTab,
   for (uint32_t i = 0; i < jsArr->Length(); ++i) {
     v8::Local<v8::Value> jsVal = jsArr->Get(i);
 
+    if (jsVal->IsNull())
+      continue;
+
     void *collElemVal;
+    OCIInd *collElemInd = nullptr;
     switch (collElemTypecode) {
     case OCI_TYPECODE_NAMEDCOLLECTION:
     case OCI_TYPECODE_OBJECT:
-      collElemVal = jsToOci(jsVal, collElemType);
+      collElemVal = jsToOci(jsVal, collElemType, collElemInd);
       break;
     default:
       collElemVal = jsPrimitiveToOciPrimitive(jsVal, collElemTypecode);
     }
 
-    ociCall(OCICollAppend(envh_, errh_, collElemVal, 0, ociTab), errh_);
+    ociCall(OCICollAppend(envh_, errh_, collElemVal, collElemInd, ociTab), errh_);
   }
 }
 
@@ -353,7 +357,7 @@ void UdtImpl::getOciObjField(void *fieldsHandle, ub2 fieldIndex, const oratext *
   ociCall (OCIAttrGet (fieldHandle, OCI_DTYPE_PARAM, &fieldTypecode, 0, OCI_ATTR_TYPECODE, errh_), errh_);
 }
 
-void UdtImpl::jsObjToOciObj(v8::Local<v8::Object> jsObj, void *ociObj, void *ociObjHandle, OCIType *ociObjTdo) {
+void UdtImpl::jsObjToOciObj(v8::Local<v8::Object> jsObj, void *ociObj, void *ociObjHandle, OCIType *ociObjTdo, OCIInd *ind) {
   ub2 fieldsCount;
   void *fieldsHandle;
   getOciObjFields(ociObjHandle, fieldsCount, fieldsHandle);
@@ -374,24 +378,26 @@ void UdtImpl::jsObjToOciObj(v8::Local<v8::Object> jsObj, void *ociObj, void *oci
     v8::Local<v8::Value> jsField = jsObj->Get(Nan::New<v8::String>(jsFieldName).ToLocalChecked());
 
     if (jsField->IsNull())
-      continue; // TODO: add test
+      continue;
 
     void *fieldValue;
+    OCIInd *fieldInd = nullptr;
     switch (fieldTypecode) {
     case OCI_TYPECODE_NAMEDCOLLECTION:
     case OCI_TYPECODE_OBJECT: {
       OCIType *fieldTdo = nullptr;
-      ociCall (OCIObjectGetAttr (envh_, errh_, ociObj, nullptr, ociObjTdo, &fieldNamePtr, &fieldNameSize, 1, 0, 0,
-                                  0, 0, 0, &fieldTdo), errh_);
-      fieldValue = jsToOci(jsField, fieldTdo);
+      void *val;
+      ociCall (OCIObjectGetAttr (envh_, errh_, ociObj, ind, ociObjTdo, &fieldNamePtr, &fieldNameSize, 1, 0, 0,
+                                  0, (void**)&fieldInd, &val, &fieldTdo), errh_);
+      fieldValue = jsToOci(jsField, fieldTdo, fieldInd);
       break;
     }
     default:
       fieldValue = jsPrimitiveToOciPrimitive(jsField, fieldTypecode);
     }
 
-    ociCall (OCIObjectSetAttr (envh_, errh_, ociObj, 0, ociObjTdo, &fieldNamePtr, &fieldNameSize, 1, 0, 0,
-                               0, 0, fieldValue), errh_);
+    ociCall (OCIObjectSetAttr (envh_, errh_, ociObj, ind, ociObjTdo, &fieldNamePtr, &fieldNameSize, 1, 0, 0,
+                               0, fieldInd, fieldValue), errh_);
   }
 }
 
@@ -405,7 +411,13 @@ void UdtImpl::describeOciTdo(OCIType *tdo, OCIDescribe *&describeHandle, void *&
     ociCall(OCIAttrGet(paramHandle, OCI_DTYPE_PARAM, &typecode, 0, OCI_ATTR_COLLECTION_TYPECODE, errh_), errh_);
 }
 
-void * UdtImpl::jsToOci(v8::Local<v8::Value> jsVal, OCIType *ociValTdo) {
+void * UdtImpl::jsToOci(v8::Local<v8::Value> jsVal, OCIType *ociValTdo, OCIInd *&ind) {
+  if (jsVal->IsNull()) {
+    static OCIInd nullInd = OCI_IND_NULL;
+    ind = &nullInd;
+    return nullptr;
+  }
+
   if (!jsVal->IsArray() && !jsVal->IsObject())
     throw UdtException("only js array or object allowed for UDT binds");
 
@@ -422,11 +434,12 @@ void * UdtImpl::jsToOci(v8::Local<v8::Value> jsVal, OCIType *ociValTdo) {
 
   void *ociObj = nullptr;
   ociCall(OCIObjectNew(envh_, errh_, svch_, typecode, ociValTdo, 0, OCI_DURATION_STATEMENT, TRUE, &ociObj), errh_);
+  ociCall(OCIObjectGetInd(envh_, errh_, ociObj, (void**)&ind), errh_);
 
   if (jsVal->IsArray())
     jsArrToOciNestedTable(v8::Local<v8::Array>::Cast(jsVal), (OCIColl*)ociObj, paramHandle);
   else if (jsVal->IsObject())
-    jsObjToOciObj(jsVal->ToObject(), ociObj, paramHandle, ociValTdo);
+    jsObjToOciObj(jsVal->ToObject(), ociObj, paramHandle, ociValTdo, ind);
 
   if (describeHandle)
     ociCall (OCIHandleFree (describeHandle, OCI_HTYPE_DESCRIBE), errh_);

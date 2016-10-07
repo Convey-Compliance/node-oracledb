@@ -516,25 +516,39 @@ describe('67 udt.js', function() {
     it('67.2.4 null', function(done) {
       connection.should.be.ok();
 
-      connection.execute("insert into test_udt(kvp_nested) values(:obj)",
+      const NULL_PRIMITIVES = { NUM: null, DATEVAL: null, RAWVAL: null },
+        NULL_TAB = [{ KEY: "k", VALUE: { KEY: null, VALUE: "v" } }, { KEY: null, VALUE: null }];
+      connection.execute("insert into test_udt(primitives, kvp_nested, nested_tab) values(:primitives, :obj, :nested_tab)",
         {
+          primitives: {
+            type: oracledb.UDT,
+            dir: oracledb.BIND_IN,
+            val: NULL_PRIMITIVES,
+            udtName: 'test_udt_primitives'
+          },
           obj: {
             type: oracledb.UDT,
             dir: oracledb.BIND_IN,
             val: null,
             udtName: 'TEST_UDT_STR_KVP_NESTED'
+          },
+          nested_tab: {
+            type: oracledb.UDT,
+            dir: oracledb.BIND_IN,
+            val: NULL_TAB,
+            udtName: 'test_udt_nested_str_kvp_table'
           }
         },
         function (err, result) {
           should.not.exist(err);
 
           result.rowsAffected.should.be.exactly(1);
-          connection.execute("SELECT kvp_nested FROM test_udt", [], { outFormat: oracledb.OBJECT }, function (err, result) {
+          connection.execute("SELECT primitives, kvp_nested, nested_tab FROM test_udt", [], { outFormat: oracledb.OBJECT }, function (err, result) {
             should.not.exist(err);
 
             should.exist(result.rows);
             result.rows.length.should.be.exactly(1);
-            should.deepEqual(result.rows[0], { KVP_NESTED: null });
+            should.deepEqual(result.rows[0], { PRIMITIVES: NULL_PRIMITIVES, KVP_NESTED: null, NESTED_TAB: NULL_TAB });
             done();
           });
         }
@@ -706,6 +720,34 @@ describe('67 udt.js', function() {
         function (err, result) {
           err.message.should.containEql('Js object contains duplicated case-insensitive fields key and KeY');
           done();
+        }
+      );
+    });
+
+    it('67.2.13 should skip null array elements because of ORA-22805', function(done) {
+      connection.should.be.ok();
+
+      connection.execute("insert into test_udt(num_tab) values(:num_tab)",
+        {
+          num_tab: {
+            type: oracledb.UDT,
+            dir: oracledb.BIND_IN,
+            val: [null, 777, null],
+            udtName: 'test_udt_num_table'
+          }
+        },
+        function (err, result) {
+          should.not.exist(err);
+
+          result.rowsAffected.should.be.exactly(1);
+          connection.execute("SELECT num_tab FROM test_udt", [], { outFormat: oracledb.OBJECT }, function (err, result) {
+            should.not.exist(err);
+
+            should.exist(result.rows);
+            result.rows.length.should.be.exactly(1);
+            should.deepEqual(result.rows[0], { NUM_TAB: [777] });
+            done();
+          });
         }
       );
     });

@@ -20,7 +20,7 @@ public:
   UdtImpl (OCIEnv *envh, OCISvcCtx *svch, OCIError *errh, const std::string &objTypeName);
 
   virtual v8::Local<v8::Value> ociToJs(void *ociVal, void *ociValNullStruct, unsigned int outFormat);
-  virtual void * jsToOci(v8::Local<v8::Object> jsObj) override;
+  virtual void * jsToOci(v8::Local<v8::Object> jsObj, void *&ind) override;
 
   const OCIType * getType() const;
 private:
@@ -37,8 +37,8 @@ private:
   v8::Local<v8::Array> ociNestedTableToJsArr(OCIColl *ociTab, void *ociTabHandle) const;
   v8::Local<v8::Value> UdtImpl::ociPrimitiveToJsPrimitive(void *ociPrimitive, OCIInd ociPrimitiveInd, OCITypeCode ociPrimitiveTypecode) const;
 
-  void * jsToOci(v8::Local<v8::Value> jsVal, OCIType *ociValTdo);
-  void jsObjToOciObj(v8::Local<v8::Object> jsObj, void *ociObj, void *ociObjHandle, OCIType *ociObjTdo);
+  void * jsToOci(v8::Local<v8::Value> jsVal, OCIType *ociValTdo, OCIInd *&ind);
+  void jsObjToOciObj(v8::Local<v8::Object> jsObj, void *ociObj, void *ociObjHandle, OCIType *ociObjTdo, OCIInd *ind);
   void jsArrToOciNestedTable(v8::Local<v8::Array> jsArr, OCIColl *ociTab, void *ociTabHandle);
   void * jsPrimitiveToOciPrimitive(v8::Local<v8::Value> jsPrimitive, OCITypeCode ociPrimitiveTypecode);
 
