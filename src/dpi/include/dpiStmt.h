@@ -120,6 +120,7 @@ typedef enum
  */
 #if OCI_MAJOR_VERSION >= 12
   #define  DPI_SZ_TYPE         sb8
+  #define  DPI_USZ_TYPE        ub8
   #define  DPI_BUFLEN_TYPE     ub4
   #define  DPIBINDBYPOS    OCIBindByPos2
   #define  DPIBINDBYNAME   OCIBindByName2
@@ -129,6 +130,7 @@ typedef enum
   #define  DPILOBWRITE     OCILobWrite2
 #else
   #define  DPI_SZ_TYPE         sb4
+  #define  DPI_USZ_TYPE        ub4
   #define  DPI_BUFLEN_TYPE     ub2
   #define  DPIBINDBYPOS    OCIBindByPos
   #define  DPIBINDBYNAME   OCIBindByName
@@ -145,8 +147,8 @@ typedef struct MetaData
   unsigned int    colNameLen;    // length of column name
   unsigned short  dbType;        // database server type
   unsigned short  dbSize;        // size at database
-  unsigned char   precision;     // precision
-  char            scale;         // scale
+  short           precision;     // precision
+  signed   char   scale;         // scale, range starts from -127
   unsigned char   isNullable;    // is the column nullable?
 
   MetaData ()
@@ -177,7 +179,7 @@ public:
 
   virtual bool        isReturning() = 0 ;
 
-  virtual DPI_SZ_TYPE  rowsAffected() const = 0;
+  virtual DPI_USZ_TYPE rowsAffected () const = 0;
 
   virtual unsigned int numCols() = 0;
 

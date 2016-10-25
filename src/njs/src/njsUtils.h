@@ -165,7 +165,7 @@ private:
   if( !args.Length() || !args[(args.Length()-1)]->IsFunction() )              \
   {                                                                           \
     errMsg = NJSMessages::getErrorMsg ( errMissingCallback );                 \
-    NJS_SET_EXCEPTION( errMsg.c_str(), errMsg.length() );                     \
+    NJS_SET_EXCEPTION ( errMsg.c_str() );                                     \
     args.GetReturnValue().SetUndefined();                                     \
     return;                                                                   \
   }                                                                           \
@@ -180,7 +180,7 @@ private:
  * Caller is expected to return from the function after calling this macro
  * for the exception to be thrown.
  */
-#define NJS_SET_EXCEPTION( str, len )                                         \
+#define NJS_SET_EXCEPTION( str )                                              \
   Nan::ThrowError(str);
 
 /*
@@ -346,7 +346,7 @@ private:
   {                                                                           \
     errMsg = NJSMessages::getErrorMsg ( errInvalidPropertyValue,              \
                                      prop );                                  \
-    NJS_SET_EXCEPTION( errMsg.c_str(), errMsg.length() );                     \
+    NJS_SET_EXCEPTION ( errMsg.c_str() );                                     \
   }                                                                           \
 }
 
@@ -366,7 +366,7 @@ private:
   {                                                                           \
     errMsg = NJSMessages::getErrorMsg ( errInvalidPropertyValue,              \
                                      prop );                                  \
-    NJS_SET_EXCEPTION( errMsg.c_str(), errMsg.length() );                     \
+    NJS_SET_EXCEPTION ( errMsg.c_str() );                                     \
   }                                                                           \
 }
 
@@ -387,7 +387,7 @@ private:
   {                                                                           \
     errMsg = NJSMessages::getErrorMsg ( errInvalidPropertyValue,              \
                                      prop );                                  \
-    NJS_SET_EXCEPTION( errMsg.c_str(), errMsg.length() );                     \
+    NJS_SET_EXCEPTION ( errMsg.c_str() );                                     \
   }                                                                           \
 }
 
@@ -413,7 +413,7 @@ private:
   if ( !p )                                                                   \
   {                                                                           \
     string error = NJSMessages::getErrorMsg ( errInvalidJSObject );           \
-    NJS_SET_EXCEPTION(error.c_str(), error.length());                         \
+    NJS_SET_EXCEPTION ( error.c_str() );                                      \
     return;                                                                   \
   }                                                                           \
 }
@@ -428,7 +428,7 @@ private:
   if ( !p )                                                                   \
   {                                                                           \
     string error = NJSMessages::getErrorMsg ( errInvalidJSObject );           \
-    NJS_SET_EXCEPTION(error.c_str(), error.length());                         \
+    NJS_SET_EXCEPTION ( error.c_str() );                                      \
     info.GetReturnValue ().SetUndefined () ;                                  \
     return;                                                                   \
   }                                                                           \
