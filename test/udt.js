@@ -345,6 +345,43 @@ describe('67 udt.js', function() {
         });
       })
     })
+
+    it('67.1.4 resultSet', function (done) {
+      connection.should.be.ok();
+
+      function fetch(connection, resultSet, done) {
+        resultSet.getRows(FETCH_BY, function (err, rows) {
+          should.not.exist(err);
+
+          if (rows.length > 0) {
+            for (var row of rows) {
+              should.deepEqual(row, { ID: currRowIdx,
+                                      KVP: { KEY: 'key ' + currRowIdx, VALUE: 'val ' + currRowIdx },
+                                      TAB: [{ KEY: 'key ' + currRowIdx, VALUE: 'val ' + currRowIdx },
+                                            { KEY: currRowIdx + 'key ', VALUE: currRowIdx + 'val ' }]
+              });
+              currRowIdx++;
+            }
+
+            if (rows.length == FETCH_BY) {
+              fetch(connection, resultSet, done);
+              return;
+            }
+          }
+
+          done();
+        });
+      }
+
+      const query = "SELECT id, kvp, tab FROM test_udt order by id";
+      const FETCH_BY = 10;
+      var currRowIdx = 0;
+      connection.execute(query, [], { outFormat: oracledb.OBJECT, resultSet: true }, function (err, result) {
+        should.not.exist(err);
+
+        fetch(connection, result.resultSet, done);
+      });
+    })
   })
 
   describe('67.2 IN bind', function() {
