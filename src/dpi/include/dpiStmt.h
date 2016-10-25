@@ -30,6 +30,8 @@
 # include <oci.h>
 #endif
 
+#include <dpiUdt.h>
+
 #if !defined(OCI_MAJOR_VERSION) || (OCI_MAJOR_VERSION < 11) || \
 ((OCI_MAJOR_VERSION == 11) && (OCI_MINOR_VERSION < 2))
 #error Oracle 11.2 or later client libraries are required for building
@@ -37,6 +39,7 @@
 
 
 #include <string>
+#include <memory>
 
 using std::string;
 
@@ -184,7 +187,7 @@ public:
   virtual void bind(unsigned int pos, unsigned short type, void  *buf,
                     DPI_SZ_TYPE bufSize, short *ind, DPI_BUFLEN_TYPE *bufLen,
                     unsigned int maxarr_len, unsigned int *curelen,
-                    void *data,
+                    void *data, dpi::Udt *udt,
                     cbtype cb = NULL ) = 0;
 
   virtual void bind(const unsigned char *name, int nameLen,
@@ -193,12 +196,13 @@ public:
                     short *ind, DPI_BUFLEN_TYPE *bufLen,
                     unsigned int maxarr_len, unsigned int *curelen,
                     void *data,
-                    cbtype cb = NULL ) = 0;
+                    dpi::Udt *udt,
+                    cbtype cb = NULL) = 0;
 
   virtual void execute ( int numIterations, bool autoCommit = false) = 0;
 
   virtual void define(unsigned int pos, unsigned short type, void *buf,
-                      DPI_SZ_TYPE bufSize, short *ind, DPI_BUFLEN_TYPE *bufLen) = 0;
+                      DPI_SZ_TYPE bufSize, short *ind, DPI_BUFLEN_TYPE *bufLen, std::shared_ptr<dpi::Udt> &udt) = 0;
 
   virtual void fetch(unsigned int numRows = 1) = 0;
 

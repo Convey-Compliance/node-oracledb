@@ -790,6 +790,17 @@ void Connection::GetBindUnit (Local<Value> val, Bind* bind, bool array,
     NJS_GET_UINT_FROM_JSON(bind->maxArraySize, executeBaton->error, bind_unit,
                            "maxArraySize", 1, exitGetBindUnit);
 
+    if (bind->type == NJS_DATATYPE_UDT) {
+      std::string udtName;
+      NJS_GET_STRING_FROM_JSON(udtName, executeBaton->error, bind_unit,
+                               "udtName", 1, exitGetBindUnit)
+      try {
+        bind->udt = executeBaton->dpiconn->getUdt(udtName);
+      } catch(dpi::Exception &e) {
+        executeBaton->error = e.what();
+        goto exitGetBindUnit;
+      }
+    }
 
     Local<Value> element = bind_unit->Get(
                                Nan::New<v8::String>("val").ToLocalChecked());
@@ -949,6 +960,21 @@ exitGetOutBindParams:
   ;
 }
 
+void Connection::GetInBindParamsUdt(Local<Value> v8val, Bind *bind, eBaton *executeBaton) {
+  bind->ind = (short *)malloc (sizeof(void*));
+  bind->len = (DPI_BUFLEN_TYPE *)malloc (sizeof(DPI_BUFLEN_TYPE));
+  bind->type = dpi::DpiUDT;
+  bind->maxSize = *bind->len = sizeof(void*);
+  bind->value = malloc(*bind->len);
+
+  try {
+    *(void**)bind->value = bind->udt->jsToOci(Local<Object>::Cast(v8val), *(void**)bind->ind);
+  } catch(dpi::Exception &e) {
+    executeBaton->error = e.what();
+  }
+
+  executeBaton->binds.push_back(bind);
+}
 
 /*****************************************************************************/
 /*
@@ -967,7 +993,11 @@ void Connection::GetInBindParams(Local<Value> v8val, Bind* bind,
 {
   Nan::HandleScope scope;
 
-  if (v8val->IsArray() )
+  if (bind->type == NJS_DATATYPE_UDT)
+  {
+    GetInBindParamsUdt(v8val, bind, executeBaton);
+  }
+  else if (v8val->IsArray() )
   {
     GetInBindParamsArray(Local<Array>::Cast(v8val), bind, executeBaton );
   }
@@ -1916,6 +1946,7 @@ void Connection::PrepareAndBind (eBaton* executeBaton)
               (executeBaton->stmtIsReturning &&
                 executeBaton->binds[index]->isOut) ?
               (void *)executeBaton : NULL,
+              executeBaton->binds[index]->udt.get(),
               (executeBaton->stmtIsReturning &&
                 executeBaton->binds[index]->isOut) ?
               Connection::cbDynBufferGet : NULL);
@@ -1965,6 +1996,7 @@ void Connection::PrepareAndBind (eBaton* executeBaton)
               (executeBaton->stmtIsReturning &&
                 executeBaton->binds[index]->isOut ) ?
                   (void *)executeBaton : NULL,
+              executeBaton->binds[index]->udt.get(),
               (executeBaton->stmtIsReturning &&
                 executeBaton->binds[index]->isOut) ?
               Connection::cbDynBufferGet : NULL);
@@ -2068,6 +2100,11 @@ void Connection::CopyMetaData ( MetaInfo           *mInfo,
         mInfo[col].njsFetchType =
                      ( mInfo[col].dpiFetchType == dpi::DpiVarChar ) ?
                                   NJS_DATATYPE_STR : NJS_DATATYPE_UNKNOWN;
+        break;
+
+      case dpi::DpiUDT:
+        mInfo[col].dpiFetchType = mData[col].dbType;
+        mInfo[col].njsFetchType = NJS_DATATYPE_DEFAULT;
         break;
 
       default:
@@ -2516,6 +2553,30 @@ void Connection::DoDefines ( eBaton* executeBaton )
         }
         break;
 
+      case dpi::DpiUDT:
+        defines[col].fetchType = executeBaton->mInfo[col].dbType;
+        defines[col].maxSize   = sizeof(void *);
+
+        if ( NJS_SIZE_T_OVERFLOW ( defines[col].maxSize,
+                                   executeBaton->maxRows ) )
+        {
+          executeBaton->error = NJSMessages::getErrorMsg( errResultsTooLarge );
+          error = true;
+        }
+        else
+        {
+          defines[col].buf = calloc( executeBaton->maxRows,
+                                     (size_t)defines[col].maxSize );
+
+          if( !defines[col].buf )
+          {
+            executeBaton->error =
+                          NJSMessages::getErrorMsg( errInsufficientMemory );
+            error = true;
+          }
+        }
+        defines[col].ind = (short*)calloc (executeBaton->maxRows, sizeof( void* ) );
+        break;
       default :
         // For unsupported column types, an error is reported earlier itself
         executeBaton->error = NJSMessages::getErrorMsg( errInternalError,
@@ -2526,8 +2587,9 @@ void Connection::DoDefines ( eBaton* executeBaton )
 
     if ( !error )
     {
-      defines[col].ind = (short*)malloc ( sizeof( short ) *
-                                          ( executeBaton->maxRows ) );
+      if (executeBaton->mInfo[col].dbType != dpi::DpiUDT)
+        defines[col].ind = (short*)malloc ( sizeof( short ) *
+                                            ( executeBaton->maxRows ) );
       if(!defines[col].ind)
       {
         executeBaton->error = NJSMessages::getErrorMsg( errInsufficientMemory );
@@ -2543,7 +2605,7 @@ void Connection::DoDefines ( eBaton* executeBaton )
 
       executeBaton->dpistmt->define(col+1, defines[col].fetchType,
                    (defines[col].buf) ? defines[col].buf : defines[col].extbuf,
-                   defines[col].maxSize, defines[col].ind, defines[col].len);
+                   defines[col].maxSize, defines[col].ind, defines[col].len, defines[col].udt);
     }
   }
 }
@@ -3083,15 +3145,21 @@ Local<Value> Connection::GetValue ( eBaton *executeBaton,
     // SELECT queries
     Define *define = &(executeBaton->defines[col]);
     long double *dblArr = (long double *)define->buf;
-    Local<Value> value = Connection::GetValueCommon(
-                           executeBaton,
-                           define->ind[row],
-                           define->fetchType,
-                           (define->fetchType == DpiTimestampLTZ ) ?
-                             (void *) &dblArr[row] :
-                             (void *) ((char *)(define->buf) +
-                              ( row * (define->maxSize ))),
-                           define->len[row] );
+    auto val = (void *) ((char *)define->buf + row * define->maxSize);
+
+    Local<Value> value;
+    if (define->fetchType == dpi::DpiUDT) {
+      auto ociObj = *(void**)val;
+      void* ociObjNullStruct = ((void**)define->ind)[row];
+      value = define->udt->ociToJs(ociObj, ociObjNullStruct, executeBaton->outFormat);
+    } else
+      value = Connection::GetValueCommon(
+                             executeBaton,
+                             define->ind[row],
+                             define->fetchType,
+                             (define->fetchType == DpiTimestampLTZ ) ?
+                               (void *) &dblArr[row] : val,
+                             define->len[row] );
     return scope.Escape( value );
   }
   else

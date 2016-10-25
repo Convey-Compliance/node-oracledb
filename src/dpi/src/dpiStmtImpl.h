@@ -78,7 +78,7 @@ public:
   virtual void bind (unsigned int pos, unsigned short type, void *buf,
                      DPI_SZ_TYPE bufSize, short *ind, DPI_BUFLEN_TYPE *bufLen,
                      unsigned int maxarr_len, unsigned int *curelen,
-                     void *data, cbtype cb);
+                     void *data, dpi::Udt *udt, cbtype cb);
 
   virtual void bind (const unsigned char *name, int nameLen,
                      unsigned int bndpos,
@@ -86,12 +86,13 @@ public:
                      short *ind, DPI_BUFLEN_TYPE *bufLen,
                      unsigned int maxarr_len, unsigned int *curelen,
                      void *data,
+                     dpi::Udt *udt,
                      cbtype cb);
 
   virtual void execute ( int numIterations, bool autoCommit );
 
   virtual void define (unsigned int pos, unsigned short type, void *buf,
-                       DPI_SZ_TYPE bufSize, short *ind, DPI_BUFLEN_TYPE *bufLen);
+                       DPI_SZ_TYPE bufSize, short *ind, DPI_BUFLEN_TYPE *bufLen, std::shared_ptr<dpi::Udt> &udt);
   virtual void fetch (unsigned int numRows = 1);
 
 
@@ -130,6 +131,7 @@ private:
   OCIError       *errh_;           // OCI Error object for this stmt execution
   OCISvcCtx      *svch_;           // OCI service handle
   OCIStmt        *stmth_;          // OCI Stmt handle
+  OCIEnv         *envh_;
 
   unsigned int   numCols_;         // # of cols this stmt execution will return
   MetaData       *meta_;           // Meta data array

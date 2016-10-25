@@ -4,6 +4,8 @@
 --ui bdd
 --timeout 100000
 
+test/udt.js
+
 test/connection.js
 test/pool.js
 test/examples.js

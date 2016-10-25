@@ -55,7 +55,7 @@
 # include <dpiDateTimeArray.h>
 #endif
 
-
+#include <dpiUdt.h>
 
 /*---------------------------------------------------------------------------
                      COMMON PUBLIC CONSTANTS

@@ -19,7 +19,8 @@
              "src/dpi/src/dpiStmtImpl.cpp",
              "src/dpi/src/dpiUtils.cpp",
              "src/dpi/src/dpiLob.cpp",
-             "src/dpi/src/dpiCommon.cpp"
+             "src/dpi/src/dpiCommon.cpp",
+             "src/dpi/src/dpiUdtImpl.cpp"
     ],
     "conditions" : [
     [

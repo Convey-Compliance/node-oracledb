@@ -437,7 +437,10 @@ void ResultSet::Async_GetRows(uv_work_t *req)
             }
           }
           break;
-
+        case dpi::DpiUDT:
+          for (unsigned int row = 0; row < ebaton->maxRows; row++)
+            ((void **)njsRS->defineBuffers_[col].buf)[row] = nullptr;
+          break;
         default:
           break;
         }

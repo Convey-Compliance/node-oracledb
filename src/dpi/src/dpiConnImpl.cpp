@@ -42,6 +42,7 @@
 #endif
 
 #include <iostream>
+#include <dpiUdtImpl.h>
 
 // Error numbers to set the drop_sess flag in sessionRelease()
 #define DPI_CONNERR_INVALID_SESS                  22
@@ -172,6 +173,12 @@ catch (...)
 ConnImpl::~ConnImpl()
 {
   cleanup();
+}
+
+std::shared_ptr<dpi::Udt> ConnImpl::getUdt(const std::string &udtName) {
+  if (udtName.empty())
+    throw UdtException("udtName option required for UDT binds");
+  return std::make_shared<UdtImpl>(envh_, svch_, errh_, udtName);
 }
 
 
