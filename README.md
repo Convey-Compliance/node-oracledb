@@ -1,5 +1,58 @@
 # node-oracledb version 1.11
 
+## Difference from official driver
+
+This fork support queries with UDT(user-defined objects) and nested tables(nested UDT and nested table of UDT also supported). For select statements oracle UDT fetched as javascript object or array(depends on outFormat setting), nested table always fetched as array:
+```
+CREATE TYPE my_obj AS OBJECT(
+  num NUMBER,
+  str VARCHAR2(200)
+); 
+/
+CREATE TYPE my_num_tab AS TABLE OF number;
+/
+CREATE TABLE my_table(
+  obj my_obj,
+  tab my_num_tab
+)
+NESTED TABLE tab STORE AS my_table_tab;
+/
+insert into my_table values (my_obj(1, 'test'), my_num_tab(1,2,3));
+```
+```
+connection.execute("select * from my_table", [], { outFormat: oracledb.OBJECT }, function(err, result) {
+  console.dir(result.rows, { depth: null }); // [ { OBJ: { NUM: 1, STR: 'test' }, TAB: [ 1, 2, 3 ] } ]
+});
+```
+
+insert\update\delete queries support binding of UDT and nested tables as IN binds. You need to set type to oracledb.UDT and provide additional option udtName - oracle type of column(looks like there is no way to get it automatically), all nested types will be detected automatically:
+```
+connection.execute("insert into my_table values(:obj, :tab)",
+  {
+    obj: {
+      type: oracledb.UDT,
+      dir: oracledb.BIND_IN,
+      val: { num: 6, str: "test"},
+      udtName: 'my_obj'
+    },
+    tab: {
+      type: oracledb.UDT,
+      dir: oracledb.BIND_IN,
+      val: [6,7,8],
+      udtName: 'my_num_tab'
+    }
+  },
+  function (err, result) {
+    // check inserted data
+    connection.execute("select * from my_table", [], { outFormat: oracledb.OBJECT }, function (err, result) {
+      console.dir(result, { depth: null }); // [ { OBJ: { NUM: 6, STR: 'test' }, TAB: [ 6, 7, 8 ] } ]
+    });
+  }
+);
+```
+
+See udt.js tests for code examples. Src code located in dpiUdtImpl.cpp. We keep new Udt object per Bind\Define and call jsToOci\ociToJs to convert data between OCI and js.
+
 ## <a name="about"></a> About node-oracledb
 
 The node-oracledb add-on for Node.js powers high performance Oracle
