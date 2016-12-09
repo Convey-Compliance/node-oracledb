@@ -17,6 +17,30 @@ describe('67 udt.js', function() {
     e_type_missing EXCEPTION;
     PRAGMA EXCEPTION_INIT(e_type_missing, -04043);
   BEGIN
+    EXECUTE IMMEDIATE('DROP TYPE test_udt_subtype');
+  EXCEPTION
+    WHEN e_type_missing THEN NULL;
+  END;
+  DECLARE
+    e_type_missing EXCEPTION;
+    PRAGMA EXCEPTION_INIT(e_type_missing, -04043);
+  BEGIN
+    EXECUTE IMMEDIATE('DROP TYPE test_udt_basetype');
+  EXCEPTION
+    WHEN e_type_missing THEN NULL;
+  END;
+  DECLARE
+    e_type_missing EXCEPTION;
+    PRAGMA EXCEPTION_INIT(e_type_missing, -04043);
+  BEGIN
+    EXECUTE IMMEDIATE('DROP TYPE test_udt_table_obj');
+  EXCEPTION
+    WHEN e_type_missing THEN NULL;
+  END;
+  DECLARE
+    e_type_missing EXCEPTION;
+    PRAGMA EXCEPTION_INIT(e_type_missing, -04043);
+  BEGIN
     EXECUTE IMMEDIATE('DROP TYPE test_udt_num_table');
   EXCEPTION
     WHEN e_type_missing THEN NULL;
@@ -92,6 +116,9 @@ describe('67 udt.js', function() {
     CREATE TYPE test_udt_num_table AS TABLE OF number
   ');
   EXECUTE IMMEDIATE('
+    CREATE TYPE test_udt_table_obj AS OBJECT(tab test_udt_num_table)
+  ');
+  EXECUTE IMMEDIATE('
     CREATE TYPE test_udt_str_table AS TABLE OF VARCHAR2(200)
   ');
   EXECUTE IMMEDIATE('
@@ -99,6 +126,12 @@ describe('67 udt.js', function() {
   ');
   EXECUTE IMMEDIATE('
     CREATE TYPE test_udt_nested_str_kvp_table AS TABLE OF test_udt_str_kvp_nested
+  ');
+  EXECUTE IMMEDIATE('
+    CREATE TYPE test_udt_basetype AS OBJECT(base_num NUMBER) not final
+  ');
+  EXECUTE IMMEDIATE('
+    CREATE TYPE test_udt_subtype force under test_udt_basetype(sub_num NUMBER)
   ');
   EXECUTE IMMEDIATE('
     CREATE TABLE test_udt(
@@ -119,6 +152,9 @@ describe('67 udt.js', function() {
   END;`;
   const dropQuery = `BEGIN
     EXECUTE IMMEDIATE('DROP TABLE test_udt');
+    EXECUTE IMMEDIATE('DROP TYPE test_udt_subtype');
+    EXECUTE IMMEDIATE('DROP TYPE test_udt_basetype');
+    EXECUTE IMMEDIATE('DROP TYPE test_udt_table_obj');
     EXECUTE IMMEDIATE('DROP TYPE test_udt_num_table');
     EXECUTE IMMEDIATE('DROP TYPE test_udt_str_table');
     EXECUTE IMMEDIATE('DROP TYPE test_udt_nested_str_kvp_table');
@@ -344,6 +380,22 @@ describe('67 udt.js', function() {
           done();
         });
       })
+
+      it('67.1.3.4 object contains null nested table field', function (done) {
+        connection.should.be.ok();
+        const queryNulls = "SELECT test_udt_table_obj(NULL) tab_obj FROM dual";
+
+        connection.execute(queryNulls, [], { outFormat: oracledb.OBJECT }, function (err, result) {
+          should.not.exist(err);
+
+          should.exist(result.rows);
+          result.rows.length.should.be.exactly(1);
+
+          should.deepEqual(result.rows[0], { TAB_OBJ: { TAB: null } });
+
+          done();
+        });
+      })
     })
 
     it('67.1.4 resultSet', function (done) {
@@ -380,6 +432,20 @@ describe('67 udt.js', function() {
         should.not.exist(err);
 
         fetch(connection, result.resultSet, done);
+      });
+    })
+
+    it('67.1.5 subtypes', function (done) {
+      connection.should.be.ok();
+
+      const query = "select test_udt_subtype(base_num => 3, sub_num => 111) subtype from dual";
+      connection.execute(query, [], { outFormat: oracledb.OBJECT }, function (err, result) {
+        should.not.exist(err);
+
+        should.exist(result.rows);
+        result.rows.length.should.be.exactly(1);
+        should.deepEqual(result.rows[0], { SUBTYPE: { BASE_NUM: 3, SUB_NUM: 111 } });
+        done();
       });
     })
   })
