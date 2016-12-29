@@ -146,6 +146,7 @@ v8::Local<v8::Object> UdtImpl::ociObjToJsObj(void *ociObj, void *ociObjHandle, O
     case OCI_TYPECODE_NAMEDCOLLECTION: {
       static OCIInd nullStruct = OCI_IND_NULL, notNullStruct = OCI_IND_NOTNULL;
       fieldNullStruct = (fieldNullStatus == OCI_IND_NULL) ? &nullStruct : &notNullStruct;
+      fieldVal = *(void**)fieldVal;
     }
     case OCI_TYPECODE_OBJECT:
       val = ociToJs(fieldVal, fieldTdo, fieldNullStruct);

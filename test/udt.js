@@ -128,7 +128,10 @@ describe('67 udt.js', function() {
     CREATE TYPE test_udt_nested_str_kvp_table AS TABLE OF test_udt_str_kvp_nested
   ');
   EXECUTE IMMEDIATE('
-    CREATE TYPE test_udt_basetype AS OBJECT(base_num NUMBER) not final
+    CREATE TYPE test_udt_basetype AS OBJECT(
+      base_num NUMBER,
+      base_tab test_udt_str_kvp_table
+    ) not final
   ');
   EXECUTE IMMEDIATE('
     CREATE TYPE test_udt_subtype force under test_udt_basetype(sub_num NUMBER)
@@ -438,13 +441,13 @@ describe('67 udt.js', function() {
     it('67.1.5 subtypes', function (done) {
       connection.should.be.ok();
 
-      const query = "select test_udt_subtype(base_num => 3, sub_num => 111) subtype from dual";
+      const query = "select test_udt_subtype(base_num => 3, base_tab => test_udt_str_kvp_table(test_udt_str_kvp('a', 'b'), test_udt_str_kvp('c', 'd')), sub_num => 111) subtype from dual";
       connection.execute(query, [], { outFormat: oracledb.OBJECT }, function (err, result) {
         should.not.exist(err);
 
         should.exist(result.rows);
         result.rows.length.should.be.exactly(1);
-        should.deepEqual(result.rows[0], { SUBTYPE: { BASE_NUM: 3, SUB_NUM: 111 } });
+        should.deepEqual(result.rows[0], { SUBTYPE: { BASE_NUM: 3, BASE_TAB: [{KEY: 'a', VALUE: 'b'}, {KEY: 'c', VALUE: 'd'}], SUB_NUM: 111 } });
         done();
       });
     })
